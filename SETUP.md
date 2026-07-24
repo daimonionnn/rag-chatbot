@@ -48,7 +48,7 @@ API. The UI is used unchanged.
 ```
               host (Linux, NVIDIA RTX PRO 6000 Blackwell, 96 GB VRAM)
   ┌──────────────────────────────────────────────────────────────────┐
-  │  ollama serve  (0.0.0.0:11434)  ──GPU──> gemma3:27b-it-fp16 (55 GB)│
+  │  ollama serve  (0.0.0.0:11434)  ──GPU──> gemma3 27B / gemma4 31B  │
   └───────────────▲──────────────────────────────────────────────────┘
                   │ OLLAMA_URL=http://172.17.0.1:11434  (+ /v1 appended)
    rootless podman network `local_rag-network`
@@ -86,6 +86,8 @@ No root:
 uv tool install podman-compose                       # ~/.local/bin/podman-compose
 curl -fsSL https://ollama.com/install.sh | sudo sh   # Ollama + CUDA runtime
 ollama pull gemma3:27b-it-fp16     # 55 GB, full precision
+ollama pull gemma4:31b-it-bf16     # 63 GB, adds tool calling (see 3a)
+ollama pull qwen3.6:27b-mtp-bf16   # 55 GB, tool calling + thinking
 ```
 `uv`, `docker` and the NVIDIA driver (v595 / CUDA 13.2, needed for Blackwell)
 were already present.
@@ -118,23 +120,52 @@ model). With 54 GB of weights that would OOM, so the server runs with
 | Context | 32768 |
 | Cold load | ~11 s |
 
-#### ⚠️ Gemma 3 does not support tool calling
+#### Registered models
 
+`gemma3:27b-it-fp16` cannot do tool calling, which breaks the UI's **Agent
+mode** and any `responses` call carrying a `file_search` tool
+(`500 … does not support tools`). Two tools-capable models were added
+alongside it, so Ollama swaps between them on demand:
+
+| Model in the UI | Tools / Agent mode | Thinking | VRAM (100% GPU) |
+|-----------------|--------------------|----------|-----------------|
+| `ollama/gemma3:27b-it-fp16` · `nemo/…` | ✗ | ✗ | 55.0 GB |
+| `ollama/gemma4:31b-it-bf16` · `nemo/…` | ✓ | ✓ | 63.7 GB |
+| `ollama/qwen3.6:27b-mtp-bf16` · `nemo/…` | ✓ | ✓ | 53.6 GB |
+| `ollama/llama3.2:3b-instruct-fp16` · `nemo/…` | ✓ | ✗ | 6.4 GB |
+
+Every model is available both directly and through the guardrails proxy, so the
+UI's model picker selects **model × rails-on/off** in one control.
+
+Direct RAG works on all of them; agentic RAG (`responses` + `file_search`) was
+verified on gemma4 and qwen3.6. Only **one large model fits in VRAM at a time**,
+so switching in the UI costs a reload (~8 s warm, ~30 s cold). Ollama
+auto-registers whatever is pulled — adding a model needs only a llamastack
+restart, no image rebuild.
+
+> Importing a model from an existing local GGUF (e.g. one LM Studio already
+> downloaded) does **not** work when the GGUF is sharded: `ollama create` fails
+> with `split GGUF … has 1 shards, expected 2`. Pull the curated library build
+> instead — it also guarantees the chat template that tool calling depends on.
+>
+> Cancelling a pull leaves its data behind; Ollama has no prune command. Delete
+> `~/.ollama/models/blobs/*-partial*`, and blobs no longer referenced by any
+> manifest under `~/.ollama/models/manifests/` (98 GB was reclaimed this way).
+
+#### If a model lands on the CPU
+
+Check placement rather than guessing — `size_vram` vs `size`:
+
+```bash
+curl -s http://localhost:11434/api/ps | python3 -m json.tool   # size vs size_vram
+nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
 ```
-$ ollama show gemma3:27b-it-fp16        → capabilities: completion, vision
-$ ollama show llama3.2:3b-instruct-fp16 → capabilities: completion, tools
-```
 
-So the UI's **Agent mode** — and any `responses` call with a `file_search`
-tool — fails against Gemma 3 with
-`500 … gemma3:27b-it-fp16 does not support tools`.
-
-**Direct RAG mode is unaffected** (`vector_stores.search` + a normal chat
-completion with the retrieved context) and gives markedly better answers than
-the old 3B model. `llama3.2:3b-instruct-fp16` is still pulled and registered, so
-Agent mode remains available by switching model in the UI. To get both quality
-*and* tool calling, a tools-capable large model (e.g. `qwen3:32b`,
-`llama3.3:70b`) would have to be pulled instead.
+Ollama decides the GPU/CPU split **at load time** from the VRAM free right then,
+and keeps it. If something else holds VRAM (LM Studio's `llama-server` did here,
+73.5 GB for a 256K-context Qwen), the model loads mostly into RAM and runs slow
+— `ollama ps` still lists it, so it looks fine. Free the VRAM, then
+`ollama stop <model>` and load again.
 
 ### 2b. Ollama must listen on all interfaces
 The stock systemd unit binds `127.0.0.1`, unreachable from rootless containers.

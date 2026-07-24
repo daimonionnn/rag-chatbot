@@ -39,6 +39,12 @@ RUN uv pip install --no-cache \
         'llama-stack==0.6.0' 'llama-stack-api==0.6.0' 'llama-stack-client==0.6.0'
 RUN pip uninstall -y uv
 
+# Fix non-latin-1 (e.g. Slovak č/š/ž) filenames silently failing to ingest:
+# llama-stack puts the raw filename in a Content-Disposition header, which HTTP
+# forbids for non-latin-1. See the script's docstring for the full story.
+COPY patch-content-disposition.py /tmp/patch-content-disposition.py
+RUN python /tmp/patch-content-disposition.py && rm /tmp/patch-content-disposition.py
+
 COPY config-0.6.0.yaml /app/config.yaml
 
 # The frontend client and this server are both 0.6.0, but keep the check off so

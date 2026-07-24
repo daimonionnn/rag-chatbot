@@ -1,0 +1,20 @@
+define flow check forbidden words
+  $result = execute check_forbidden_words
+  if $result != "allowed"
+    bot inform cannot help with topic
+    stop
+
+define bot inform cannot help with topic
+  "Prepáčte, nemôžem pomôcť s touto témou. Prosím, preformulujte svoju otázku."
+
+define flow check language
+  $result = execute check_language
+  if $result != "allowed"
+    bot inform wrong language
+    stop
+
+define bot inform wrong language
+  "Prepáčte, tento asistent komunikuje len v slovenčine. Prosím, napíšte svoju otázku po slovensky."
+
+define bot refuse to respond
+  "Prepáčte, nemôžem odpovedať na túto požiadavku z bezpečnostných dôvodov."

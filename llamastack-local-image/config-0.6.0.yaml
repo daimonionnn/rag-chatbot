@@ -23,6 +23,20 @@ providers:
       # Append /v1 so the compose-provided OLLAMA_URL (e.g. http://172.17.0.1:11434,
       # no /v1) still hits Ollama's OpenAI-compatible endpoint.
       base_url: ${env.OLLAMA_URL:=http://localhost:11434}/v1
+  # Same LLM, but reached through the NeMo Guardrails proxy so input/output
+  # rails apply. Registered alongside the direct `ollama` provider so the UI's
+  # model picker doubles as a guardrails on/off switch. Uses remote::vllm
+  # because NeMo exposes a plain OpenAI-compatible API (this mirrors upstream,
+  # where the only guardrails change was swapping this provider's URL).
+  - provider_id: nemo
+    provider_type: remote::vllm
+    config:
+      # 0.6.0's remote::vllm adapter expects `base_url` (upstream's backup
+      # run-config still used the older `url:` key, which is silently ignored
+      # and makes the provider fail with "You must provide a URL").
+      base_url: ${env.NEMO_URL:=http://nemo-guardrails:9000}/v1
+      api_token: fake
+      max_tokens: 4096
   - provider_id: sentence-transformers
     provider_type: inline::sentence-transformers
   vector_io:
@@ -101,6 +115,12 @@ registered_resources:
   models:
   - model_id: ${env.INFERENCE_MODEL:=llama3.2:3b-instruct-fp16}
     provider_id: ollama
+    model_type: llm
+  # Guardrailed variant of the same model. Shows up as
+  # `nemo/llama3.2:3b-instruct-fp16` next to `ollama/llama3.2:3b-instruct-fp16`.
+  - model_id: ${env.INFERENCE_MODEL:=llama3.2:3b-instruct-fp16}
+    provider_id: nemo
+    provider_model_id: ${env.INFERENCE_MODEL:=llama3.2:3b-instruct-fp16}
     model_type: llm
   - model_id: all-MiniLM-L6-v2
     provider_id: sentence-transformers

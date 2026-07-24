@@ -1,0 +1,35 @@
+# NeMo Guardrails server for the local RAG chatbot.
+#
+# Upstream (Sheryl-shiyi/Nemo-guardrial-deployment) deploys this through the
+# TrustyAI `NemoGuardrails` CRD on OpenShift AI, which supplies the image. There
+# is no reusable image for a local podman setup, so we run the `nemoguardrails`
+# server ourselves with the same rails config.
+#
+# It acts as a transparent OpenAI-compatible proxy in front of the LLM:
+#   llamastack -> nemo-guardrails (:9000/v1) -> host Ollama (:11434/v1)
+#
+# Build:
+#   podman build -t localhost/nemo-guardrails:local nemo-local
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl gcc g++ && rm -rf /var/lib/apt/lists/*
+
+# `numpy<2` is REQUIRED: fasttext (used by the check_language action) still calls
+# np.array(..., copy=False), which NumPy 2 rejects with a ValueError. actions.py
+# swallows every exception and returns "allowed", so with NumPy 2 the language
+# rail silently never blocks anything.
+RUN pip install --no-cache-dir "nemoguardrails[server]" fasttext-wheel "numpy<2"
+
+# Pre-bake the fastText language-ID model so the first request doesn't have to
+# download it (actions.py falls back to fetching it into /tmp).
+RUN curl -fsSL -o /tmp/lid.176.ftz \
+        https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz
+
+COPY configs /config
+
+ENV OPENAI_API_KEY=dummy \
+    PYTHONUNBUFFERED=1
+EXPOSE 9000
+CMD ["nemoguardrails", "server", "--config", "/config", \
+     "--default-config-id", "rag", "--port", "9000"]

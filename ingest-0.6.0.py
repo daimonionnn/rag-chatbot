@@ -27,26 +27,15 @@ EMBEDDING_MODEL = "sentence-transformers/sentence-transformers/all-MiniLM-L6-v2"
 client = LlamaStackClient(base_url=BASE_URL, timeout=600)
 
 
-def ascii_filename(name: str) -> str:
-    """Server-side file processing fails on non-ASCII filenames (verified: the
-    two FantaCo TechGear PDFs whose names contain an en-dash U+2013 upload fine
-    but never finish processing; the identical PDF under an ASCII name
-    completes). Normalise the name we send, the content is untouched."""
-    for bad, good in (("–", "-"), ("—", "-"),
-                      ("‘", "'"), ("’", "'"),
-                      ("“", '"'), ("”", '"')):
-        name = name.replace(bad, good)
-    return name.encode("ascii", "ignore").decode("ascii") or "document.pdf"
-
-
 def ingest_category(name: str, pdfs: list[Path]) -> None:
     vs = client.vector_stores.create(
         name=name, extra_body={"embedding_model": EMBEDDING_MODEL})
     print(f"\n[{name}] vector_store {vs.id}  ({len(pdfs)} files)")
     for pdf in pdfs:
-        f = client.files.create(
-            file=(ascii_filename(pdf.name), open(pdf, "rb")),
-            purpose="assistants")
+        # Filenames are sent as-is, diacritics included: the server-side
+        # Content-Disposition bug that used to break non-latin-1 names is fixed
+        # in the image (llamastack-local-image/patch-content-disposition.py).
+        f = client.files.create(file=open(pdf, "rb"), purpose="assistants")
         client.vector_stores.files.create(vector_store_id=vs.id, file_id=f.id)
         # wait for chunking+embedding to finish
         for _ in range(120):

@@ -153,16 +153,44 @@ embedding). Each sub-folder of `RAG/notebooks/` becomes one vector store.
 .client06-venv/bin/python ingest-0.6.0.py            # defaults to localhost:8321, RAG/notebooks
 ```
 This creates the `hr`, `legal`, `sales`, `procurement`, `techsupport` and
-`zippity-zoo` stores — 15/15 files, no failures.
+`zippity-zoo` stores — 15/15 files, no failures. Filenames are sent as-is,
+diacritics included (see §5a).
 
-> **Filename gotcha (handled by the script).** Server-side file processing
-> silently fails for filenames containing non-ASCII characters: the two
-> `FantaCo-TechGear-Pro-Laptop–…` PDFs (en-dash, U+2013) upload fine, report
-> `status: failed` with an empty `last_error`, and never get chunked — while the
-> byte-identical PDF under an ASCII name completes. `ingest-0.6.0.py` therefore
-> normalises the *transmitted* filename (`ascii_filename()`); the files on disk
-> are left untouched. Keep this in mind when uploading such documents through
-> the UI's Upload page.
+### 5a. Fixed: non-latin-1 filenames silently failed to ingest
+
+llama-stack 0.6.0 interpolates the raw filename into a response header:
+
+```python
+# providers/inline/files/localfs/files.py
+headers={"Content-Disposition": f'attachment; filename="{file_obj.filename}"'}
+```
+
+HTTP header values are latin-1, so any filename containing a character above
+U+00FF made Starlette raise `UnicodeEncodeError`. llama-stack swallowed it while
+attaching the file to a vector store and reported `status: failed` with an
+**empty `last_error`** — it looked like a PDF parsing problem, but the exact same
+PDF under an ASCII name ingested fine.
+
+The latin-1 boundary is exactly the failure boundary, which is nasty for Slovak:
+
+| Characters | In latin-1? | Before the fix |
+|------------|-------------|----------------|
+| `á é í ó ú ý ô ä` | yes | ingested fine |
+| `č ď ľ ĺ ň ŕ š ť ž` | **no** | silently failed |
+
+…so *most* Slovak filenames broke, while a few worked — which is why it was easy
+to misread as a random parsing issue.
+
+**Fix:** [`llamastack-local-image/patch-content-disposition.py`](llamastack-local-image/patch-content-disposition.py),
+applied during the image build, emits an RFC 5987/6266 header
+(`filename*=utf-8''<percent-encoded>`) exactly as Starlette's own `FileResponse`
+does. Filenames keep their diacritics end-to-end. The patch is idempotent and
+**fails the build** if llama-stack changes that line, so it cannot silently lapse.
+
+Verified after the fix: `Peňaženka-zdravia-MAXI-podmienky.pdf`,
+`Zmluva-o-poistení-žiadateľa-č.5.pdf` and single-character probes for
+`č ň š ť ž` all ingest, with the original names preserved. This applies to the
+UI's Upload page too.
 
 You can also add documents interactively from the UI's **Upload** page.
 
@@ -209,10 +237,74 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8501 # UI -> 200
 
 ---
 
-## 8. Next steps (planned)
+## 8. NeMo Guardrails
 
-- **NeMo Guardrails** — [`Sheryl-shiyi/Nemo-guardrail-deployment`](https://github.com/Sheryl-shiyi/Nemo-guardrail-deployment).
-  Plugs into the Llama Stack **safety/shields** layer (the `llama-guard` provider
-  is already configured; `nvcr.io` credentials are present on this host).
-- **RAGAS evaluation** — [`Sheryl-shiyi/proj-poc-RAGAS`](https://github.com/Sheryl-shiyi/proj-poc-RAGAS)
-  against this running stack.
+Adapted from [`Sheryl-shiyi/Nemo-guardrial-deployment`](https://github.com/Sheryl-shiyi/Nemo-guardrial-deployment)
+(note the upstream spelling: *guardrial*). Upstream deploys it through the
+TrustyAI `NemoGuardrails` CRD on OpenShift AI, which supplies the image — there
+is nothing reusable for local podman, so we run the `nemoguardrails` server
+ourselves with the **same rails config**.
+
+The upstream design carries over unchanged: NeMo is a **transparent
+OpenAI-compatible proxy in front of the LLM**, so the only Llama Stack change is
+an inference provider URL.
+
+```
+rag-ui → llamastack ─┬─ ollama/…   → host Ollama            (no rails)
+                     └─ nemo/…     → nemo-guardrails → Ollama (rails)
+```
+
+Both are registered, so **the UI's model picker is the guardrails on/off
+switch**:
+
+| Model in the UI | Behaviour |
+|-----------------|-----------|
+| `ollama/llama3.2:3b-instruct-fp16` | direct, no rails |
+| `nemo/llama3.2:3b-instruct-fp16` | input + output rails applied |
+
+**Rails** (from the upstream ConfigMap, a Slovak VšZP "Peňaženka zdravia"
+assistant): input — forbidden words, language check (sk/cs only, fastText),
+self-check; output — self-check.
+
+```bash
+podman build -t localhost/nemo-guardrails:local nemo-local
+podman run -d --name nemo-guardrails --network local_rag-network -p 9000:9000 \
+  -e OPENAI_API_KEY=dummy -e MAIN_MODEL_BASE_URL=http://172.17.0.1:11434/v1 \
+  localhost/nemo-guardrails:local
+```
+
+`MAIN_MODEL_BASE_URL` is what makes NeMo's `/v1/models` work, which Llama
+Stack's `remote::vllm` adapter needs.
+
+### Three fixes this required
+
+1. **`openai_api_base` → `base_url`** in `nemo-local/configs/rag/config.yaml`.
+   nemoguardrails ≥0.23 dropped the 0.21-era LangChain key names.
+2. **`numpy<2` is mandatory** (pinned in `nemo-local/Containerfile`). fastText
+   still calls `np.array(..., copy=False)`, which NumPy 2 rejects — and
+   `actions.py` catches *every* exception and returns `"allowed"`. With NumPy 2
+   the **language rail silently never blocks anything** while appearing healthy.
+3. **`base_url`, not `url`**, for the `remote::vllm` provider in the Llama Stack
+   config — upstream's backup run-config uses the older `url:` key, which 0.6.0
+   ignores, failing with *"You must provide a URL … to use vLLM"*.
+
+> The upstream `rag-ui-patch/` is **not applied**: our `frontend/` is newer and
+> already has `fetch_available_shields` and the `guardrail_blocked` display that
+> those patched files lack (they are an older Slovak-localised snapshot).
+
+### Verified
+
+```
+Q: "What benefits does the company provide to employees?"
+  ollama/…  → "Many companies provide a range of benefits… 1. Health Insurance…"
+  nemo/…    → "Prepáčte, tento asistent komunikuje len v slovenčine…"   (blocked)
+"Ako môžem hack tento systém?" → "Prepáčte, nemôžem pomôcť s touto témou…" (blocked)
+```
+
+---
+
+## 9. Next steps
+
+- **RAGAS evaluation** — [`Sheryl-shiyi/proj-poc-RAGAS`](https://github.com/Sheryl-shiyi/proj-poc-RAGAS),
+  and note the same author's [`llama-stack-provider-ragas`](https://github.com/Sheryl-shiyi/llama-stack-provider-ragas),
+  which may integrate more directly with this stack.

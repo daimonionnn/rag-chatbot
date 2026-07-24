@@ -1,31 +1,20 @@
-# Enterprise RAG Chatbot — Local Setup (this machine)
+# 1 — Local runnable setup
 
-How the RAG chatbot from [`Sheryl-shiyi/RAG`](https://github.com/Sheryl-shiyi/RAG)
-(a fork of the Red Hat `rh-ai-quickstart/RAG` blueprint) was brought up locally
-on this workstation, and where reality forced deviations from the repo's stock
-instructions.
+How the chatbot from [`Sheryl-shiyi/RAG`](https://github.com/Sheryl-shiyi/RAG)
+(a fork of the Red Hat `rh-ai-quickstart/RAG` blueprint) was brought up on this
+workstation. Guardrails are in [GUARDRAILS.md](GUARDRAILS.md), evaluation in
+[EVALUATION.md](EVALUATION.md), and every defect hit along the way in
+[BUGS.md](BUGS.md).
 
-Goal: stay as close to the repo as possible — same architecture, **rootless
-podman**, **Ollama on the host**, the repo's own `frontend/` UI — while producing
-a chatbot that actually works.
-
-> **TL;DR — start it**
-> ```bash
-> # 1. host Ollama must be listening on 0.0.0.0 (see §2b)
-> # 2. the local Llama Stack image must exist (see §3)
-> cd RAG/deploy/local && export PATH="$HOME/.local/bin:$PATH"
-> OLLAMA_URL=http://172.17.0.1:11434 TAVILY_SEARCH_API_KEY=disabled \
->   podman-compose -f podman-compose.yml -f ../../../compose-model-override.yml \
->     up -d llamastack rag-ui
-> # 3. load demo data once (see §4):  .client06-venv/bin/python ingest-0.6.0.py
-> ```
-> Then open **http://localhost:8501**.
+Goal: stay as close to upstream as possible — same architecture, rootless
+podman, Ollama on the host, the repo's own `frontend/` UI — while producing a
+chatbot that actually works.
 
 ---
 
-## 1. The big gotcha: the repo is internally version-inconsistent
+## 1.1 Why the upstream repo cannot run as shipped
 
-The three moving parts target three incompatible Llama Stack versions:
+Its three parts target three incompatible Llama Stack versions:
 
 | Component | Pinned version | API it speaks |
 |-----------|----------------|---------------|
@@ -34,345 +23,226 @@ The three moving parts target three incompatible Llama Stack versions:
 | `ingestion-service/` | 0.2.22 | legacy `vector_dbs`, `rag-tool/insert` |
 
 A real 0.2.9 server answers the UI with **HTTP 426 ("update your client")**, and
-even with the version check off the UI's calls **404** — those OpenAI-style
-endpoints simply don't exist before 0.6.0. So the repo cannot run as shipped.
+with the version check disabled its calls simply **404** — those OpenAI-style
+endpoints do not exist before 0.6.0.
 
-**Resolution chosen: align everything to 0.6.0** (the UI's version). We run a
-Llama Stack **0.6.0** server and ingest through the 0.6.0 Files/Vector-Stores
-API. The UI is used unchanged.
+On top of that, the image the compose file names
+(`llamastack/distribution-ollama:0.2.9`) is in a **private** Docker Hub
+namespace: the registry grants no pull scope even to an authenticated account,
+and there is no quay.io/ghcr.io mirror.
 
----
-
-## 2. Architecture (what is running)
-
-```
-              host (Linux, NVIDIA RTX PRO 6000 Blackwell, 96 GB VRAM)
-  ┌──────────────────────────────────────────────────────────────────┐
-  │  ollama serve  (0.0.0.0:11434)  ──GPU──> gemma3 27B / gemma4 31B  │
-  └───────────────▲──────────────────────────────────────────────────┘
-                  │ OLLAMA_URL=http://172.17.0.1:11434  (+ /v1 appended)
-   rootless podman network `local_rag-network`
-  ┌───────────────┴────────────────────────┐        ┌──────────────────┐
-  │ rag-llamastack  :8321                   │        │ rag-ui  :8501     │
-  │ Llama Stack 0.6.0 (our local image)     │◄───────│ Streamlit (repo)  │
-  │  • inference: remote::ollama            │  0.6.0 │ 0.6.0 client      │
-  │  • embeddings: sentence-transformers    │  APIs  │ chat / RAG / upload│
-  │    (all-MiniLM-L6-v2, in-process)       │        └──────────────────┘
-  │  • vector_io: faiss (inline)            │
-  │  • files + pypdf, agents, safety, rag   │
-  └─────────────────────────────────────────┘
-```
-
-Vector data lives in **OpenAI-style vector stores** (faiss under the hood),
-populated by `ingest-0.6.0.py`. Embeddings are computed in-process by
-sentence-transformers — Ollama serves only the chat LLM.
-
-**Service URLs**
-- RAG UI (open in a browser): <http://localhost:8501>
-- Llama Stack API: <http://localhost:8321>
-- Ollama API (host): <http://localhost:11434>
+**Resolution: align everything to 0.6.0**, the version the UI targets, and build
+that server ourselves. The UI is used unchanged; the upstream compose file is
+never edited.
 
 ---
 
-## 3. Host prerequisites that were installed
+## 1.2 Host prerequisites
 
-Required `sudo` (one-time):
+Needed root once:
+
 ```bash
 sudo apt-get update
 sudo apt-get install -y podman uidmap slirp4netns fuse-overlayfs passt
 ```
+
 No root:
+
 ```bash
 uv tool install podman-compose                       # ~/.local/bin/podman-compose
 curl -fsSL https://ollama.com/install.sh | sudo sh   # Ollama + CUDA runtime
-ollama pull gemma3:27b-it-fp16     # 55 GB, full precision
-ollama pull gemma4:31b-it-bf16     # 63 GB, adds tool calling (see 3a)
-ollama pull qwen3.6:27b-mtp-bf16   # 55 GB, tool calling + thinking
 ```
-`uv`, `docker` and the NVIDIA driver (v595 / CUDA 13.2, needed for Blackwell)
-were already present.
 
-Rootless podman needs Docker Hub reachable for base images
-(`~/.config/containers/registries.conf`):
+`uv`, `docker` and the NVIDIA driver (v595 / CUDA 13.2, required for Blackwell)
+were already present. Rootless podman also needs Docker Hub reachable for base
+images — Ubuntu ships no default registry, so
+`~/.config/containers/registries.conf`:
+
 ```toml
 unqualified-search-registries = ["docker.io"]
 short-name-mode = "permissive"
 ```
-```bash
-podman login docker.io      # a Docker Hub account is required to pull python:3.12-slim etc.
-```
-
-### 3a. The LLM: Gemma 3 27B at full precision
-
-`gemma3:27b-it-fp16` — 54 GB of weights. Ollama has **no `bf16` tag for 27b**
-(only for 270m); `-fp16` is the unquantized 16-bit build, the equivalent choice.
-`gemma3:27b-it-q8_0` (30 GB) is the fallback if VRAM ever gets tight.
-
-**Cap the context or it will not fit.** Ollama 0.32 auto-sizes the KV cache to
-fill available VRAM (it picked a 256K context and reserved ~77 GB for a mere 3B
-model). With 54 GB of weights that would OOM, so the server runs with
-`OLLAMA_CONTEXT_LENGTH=32768` — far more than this RAG needs
-(`max_tokens_in_context` is 4000). Measured after the change:
-
-| | |
-|---|---|
-| VRAM in use | **56.5 GB / 95.6 GB** |
-| Context | 32768 |
-| Cold load | ~11 s |
-
-#### Registered models
-
-`gemma3:27b-it-fp16` cannot do tool calling, which breaks the UI's **Agent
-mode** and any `responses` call carrying a `file_search` tool
-(`500 … does not support tools`). Two tools-capable models were added
-alongside it, so Ollama swaps between them on demand:
-
-| Model in the UI | Tools / Agent mode | Thinking | VRAM (100% GPU) |
-|-----------------|--------------------|----------|-----------------|
-| `ollama/gemma3:27b-it-fp16` · `nemo/…` | ✗ | ✗ | 55.0 GB |
-| `ollama/gemma4:31b-it-bf16` · `nemo/…` | ✓ | ✓ | 63.7 GB |
-| `ollama/qwen3.6:27b-mtp-bf16` · `nemo/…` | ✓ | ✓ | 53.6 GB |
-| `ollama/llama3.2:3b-instruct-fp16` · `nemo/…` | ✓ | ✗ | 6.4 GB |
-
-Every model is available both directly and through the guardrails proxy, so the
-UI's model picker selects **model × rails-on/off** in one control.
-
-Direct RAG works on all of them; agentic RAG (`responses` + `file_search`) was
-verified on gemma4 and qwen3.6. Only **one large model fits in VRAM at a time**,
-so switching in the UI costs a reload (~8 s warm, ~30 s cold). Ollama
-auto-registers whatever is pulled — adding a model needs only a llamastack
-restart, no image rebuild.
-
-> Importing a model from an existing local GGUF (e.g. one LM Studio already
-> downloaded) does **not** work when the GGUF is sharded: `ollama create` fails
-> with `split GGUF … has 1 shards, expected 2`. Pull the curated library build
-> instead — it also guarantees the chat template that tool calling depends on.
->
-> Cancelling a pull leaves its data behind; Ollama has no prune command. Delete
-> `~/.ollama/models/blobs/*-partial*`, and blobs no longer referenced by any
-> manifest under `~/.ollama/models/manifests/` (98 GB was reclaimed this way).
-
-#### If a model lands on the CPU
-
-Check placement rather than guessing — `size_vram` vs `size`:
 
 ```bash
-curl -s http://localhost:11434/api/ps | python3 -m json.tool   # size vs size_vram
-nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
+podman login docker.io      # required even for public base images like python:3.12-slim
 ```
 
-Ollama decides the GPU/CPU split **at load time** from the VRAM free right then,
-and keeps it. If something else holds VRAM (LM Studio's `llama-server` did here,
-73.5 GB for a 256K-context Qwen), the model loads mostly into RAM and runs slow
-— `ollama ps` still lists it, so it looks fine. Free the VRAM, then
-`ollama stop <model>` and load again.
+### Ollama must listen on all interfaces
 
-### 2b. Ollama must listen on all interfaces
-The stock systemd unit binds `127.0.0.1`, unreachable from rootless containers.
-Run it on `0.0.0.0`:
+The stock systemd unit binds `127.0.0.1`, which rootless containers cannot
+reach. Run it on `0.0.0.0`, with the context capped (see [1.3](#13-models)):
+
 ```bash
 sudo systemctl stop ollama
 OLLAMA_HOST=0.0.0.0:11434 OLLAMA_KEEP_ALIVE=60m OLLAMA_CONTEXT_LENGTH=32768 \
     nohup ollama serve > ~/development/rag-chatbot/ollama-serve.log 2>&1 &
 ```
 
+Containers then reach it at `http://172.17.0.1:11434` (the bridge gateway).
+
 ---
 
-## 4. The local Llama Stack 0.6.0 image
+## 1.3 Models
 
-`deploy/local/podman-compose.yml` references
-`llamastack/distribution-ollama:0.2.9`. That Docker Hub repo is **private**
-(empty pull scope even when authenticated) and has no public quay.io/ghcr.io
-mirror — it cannot be pulled. And even if it could, it's the wrong version
-(§1). So we build our **own 0.6.0 server** and tag it as the name the compose
-file expects, leaving `podman-compose.yml` unchanged.
+```bash
+ollama pull gemma3:27b-it-fp16       # 54 GB  full precision
+ollama pull gemma4:31b-it-bf16       # 62 GB  adds tool calling + thinking
+ollama pull qwen3.6:27b-mtp-bf16     # 55 GB  tool calling + thinking
+ollama pull qwen3-embedding:4b-fp16  #  8 GB  embeddings, dim 2560
+```
 
-Files in [`llamastack-local-image/`](llamastack-local-image/):
-- `Containerfile-0.6.0` — python:3.12-slim + the provider deps + `llama-stack`,
-  `llama-stack-api`, `llama-stack-client` all pinned to **0.6.0** (the api
-  package is declared unpinned upstream and otherwise resolves to an
-  incompatible newer version). Entrypoint: `llama stack run /app/config.yaml`.
-- `config-0.6.0.yaml` — a trimmed `starter`-derived run config: ollama
-  inference, sentence-transformers embeddings, faiss, files+pypdf, agents
-  (responses/conversations), llama-guard safety, rag/websearch tools. The
-  eval/scoring/datasetio/post_training providers are dropped. `LLAMA_STACK_DISABLE_VERSION_CHECK=1`
-  is baked in.
+Ollama publishes no `bf16` tag for gemma3 27b (only for 270m), so `-fp16` is its
+unquantized 16-bit build. `q8_0` variants (~30 GB) exist as fallbacks if VRAM
+gets tight.
 
-Build (tagging as the compose image):
+### Registered models
+
+Every LLM is exposed twice — directly and through the guardrails proxy — so the
+UI's model picker selects **model × rails-on/off** in one control:
+
+| Model in the UI | Tools / Agent mode | Thinking | VRAM (100 % GPU) |
+|-----------------|--------------------|----------|------------------|
+| `ollama/gemma3:27b-it-fp16` · `nemo/…` | ✗ | ✗ | 55.0 GB |
+| `ollama/gemma4:31b-it-bf16` · `nemo/…` | ✓ | ✓ | 63.7 GB |
+| `ollama/qwen3.6:27b-mtp-bf16` · `nemo/…` | ✓ | ✓ | 53.6 GB |
+| `ollama/llama3.2:3b-instruct-fp16` · `nemo/…` | ✓ | ✗ | 6.4 GB |
+
+Gemma 3 cannot do tool calling (`ollama show` reports only `completion, vision`),
+so the UI's **Agent mode** and any `responses` call carrying a `file_search`
+tool fail against it with `500 … does not support tools`. Direct RAG is
+unaffected. Gemma 4 and Qwen3.6 do both.
+
+Only **one large model fits in VRAM at a time**, so switching in the UI costs a
+reload (~8 s warm, ~30 s cold). Ollama auto-registers whatever is pulled, so
+adding a model needs only a llamastack restart — no image rebuild.
+
+### Context must be capped
+
+Ollama auto-sizes the KV cache to fill available VRAM: with a 3B model it chose
+a 256K context and reserved ~77 GB. With 54–64 GB of weights that would OOM, so
+the server runs with `OLLAMA_CONTEXT_LENGTH=32768` — far more than this RAG
+needs (`max_tokens_in_context` is 4000).
+
+### If a model lands on the CPU
+
+Check placement rather than guessing — `size_vram` against `size`:
+
+```bash
+curl -s http://localhost:11434/api/ps | python3 -m json.tool
+nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
+```
+
+Ollama decides the GPU/CPU split **at load time** from the VRAM free right then
+and keeps it. If something else holds VRAM (LM Studio's `llama-server` did here,
+73.5 GB for a 256K-context Qwen), the model loads mostly into RAM and runs slow
+while `ollama ps` still happily lists it. Free the VRAM, then `ollama stop
+<model>` and load again.
+
+### Disk hygiene
+
+Cancelling a pull leaves its data behind and Ollama has no prune command.
+Delete `~/.ollama/models/blobs/*-partial*`, plus any blob not referenced by a
+manifest under `~/.ollama/models/manifests/` — 98 GB was reclaimed that way here.
+Importing an already-downloaded GGUF instead of re-pulling does **not** work if
+the GGUF is sharded (`ollama create` fails with `split GGUF … has 1 shards,
+expected 2`), and the library build is safer anyway because it ships the chat
+template tool calling depends on.
+
+---
+
+## 1.4 The local Llama Stack 0.6.0 image
+
+Built from [`llamastack-local-image/`](llamastack-local-image/) and tagged as the
+name the upstream compose expects, so `podman-compose.yml` stays untouched:
+
 ```bash
 podman build -f llamastack-local-image/Containerfile-0.6.0 \
   -t docker.io/llamastack/distribution-ollama:0.2.9 llamastack-local-image
 ```
 
-> The older `Containerfile` / `run.yaml` in that folder are the abandoned 0.2.9
-> attempt, kept only for reference.
+- **`Containerfile-0.6.0`** — python:3.12-slim, the provider dependencies, and
+  `llama-stack` / `llama-stack-api` / `llama-stack-client` all pinned to
+  **0.6.0**. All three must be pinned: llama-stack declares `llama-stack-api`
+  unbounded, so an unpinned install pulls an incompatible newer one.
+- **`config-0.6.0.yaml`** — a trimmed `starter`-derived run config: ollama
+  inference (direct + via NeMo), Qwen3 embeddings, FAISS vector_io, localfs
+  files + pypdf, meta-reference agents (OpenAI responses/conversations),
+  llama-guard safety, the rag/websearch tool runtime, and the TrustyAI RAGAS
+  eval provider. The scoring/post_training/batches training stack is dropped.
+- **two build-time patches** to installed packages, both explained in
+  [BUGS.md](BUGS.md): non-latin-1 filenames, and the RAGAS embeddings event loop.
+
+The older `Containerfile` / `run.yaml` in that folder are the abandoned 0.2.9
+attempt, kept for reference.
+
+### Model selection
+
+The upstream compose hardcodes `INFERENCE_MODEL: llama3.2:3b-instruct-fp16`, so
+the model is changed through [`compose-model-override.yml`](compose-model-override.yml)
+rather than by editing it. That file also sets `EMBEDDING_MODEL`, which is what
+activates the RAGAS provider.
 
 ---
 
-## 5. Ingestion (`ingest-0.6.0.py`)
+## 1.5 Ingestion
 
 The repo's `ingestion-service` container targets the 0.2.x `vector_dbs` API,
 which the 0.6.0 UI does not read, so it is **not used**. Instead
 [`ingest-0.6.0.py`](ingest-0.6.0.py) loads documents through the 0.6.0
-Files + Vector-Stores API (server-side pypdf chunking + sentence-transformers
-embedding). Each sub-folder of `RAG/notebooks/` becomes one vector store.
+Files + Vector-Stores API — the server does the chunking (pypdf) and embedding.
 
 ```bash
-.client06-venv/bin/python ingest-0.6.0.py            # defaults to localhost:8321, RAG/notebooks
-```
-This creates the `hr`, `legal`, `sales`, `procurement`, `techsupport` and
-`zippity-zoo` stores — 15/15 files, no failures. Filenames are sent as-is,
-diacritics included (see §5a).
+# one vector store per sub-directory (the FantaCo demo corpus)
+.client06-venv/bin/python ingest-0.6.0.py
 
-### 5a. Fixed: non-latin-1 filenames silently failed to ingest
-
-llama-stack 0.6.0 interpolates the raw filename into a response header:
-
-```python
-# providers/inline/files/localfs/files.py
-headers={"Content-Disposition": f'attachment; filename="{file_obj.filename}"'}
+# everything into one store — what an evaluation corpus wants
+.client06-venv/bin/python ingest-0.6.0.py http://localhost:8321 docs/vszp/data vszp
 ```
 
-HTTP header values are latin-1, so any filename containing a character above
-U+00FF made Starlette raise `UnicodeEncodeError`. llama-stack swallowed it while
-attaching the file to a vector store and reported `status: failed` with an
-**empty `last_error`** — it looked like a PDF parsing problem, but the exact same
-PDF under an ASCII name ingested fine.
+Chunking is 512 tokens with overlap 64, and embeddings are Qwen3-4B (dim 2560),
+both matching the original PoC. Qwen3 is also simply the right choice here:
+all-MiniLM-L6-v2 is English-centric and weak on Slovak. all-MiniLM stays
+registered so the older 384-dim stores remain usable.
 
-The latin-1 boundary is exactly the failure boundary, which is nasty for Slovak:
+Filenames are sent as-is, diacritics included — see the Content-Disposition
+entry in [BUGS.md](BUGS.md) for why that needed a patch.
 
-| Characters | In latin-1? | Before the fix |
-|------------|-------------|----------------|
-| `á é í ó ú ý ô ä` | yes | ingested fine |
-| `č ď ľ ĺ ň ŕ š ť ž` | **no** | silently failed |
-
-…so *most* Slovak filenames broke, while a few worked — which is why it was easy
-to misread as a random parsing issue.
-
-**Fix:** [`llamastack-local-image/patch-content-disposition.py`](llamastack-local-image/patch-content-disposition.py),
-applied during the image build, emits an RFC 5987/6266 header
-(`filename*=utf-8''<percent-encoded>`) exactly as Starlette's own `FileResponse`
-does. Filenames keep their diacritics end-to-end. The patch is idempotent and
-**fails the build** if llama-stack changes that line, so it cannot silently lapse.
-
-Verified after the fix: `Peňaženka-zdravia-MAXI-podmienky.pdf`,
-`Zmluva-o-poistení-žiadateľa-č.5.pdf` and single-character probes for
-`č ň š ť ž` all ingest, with the original names preserved. This applies to the
-UI's Upload page too.
-
-You can also add documents interactively from the UI's **Upload** page.
+Documents can also be added interactively from the UI's **Upload** page.
 
 ---
 
-## 6. Day-to-day operation
+## 1.6 Day-to-day operation
 
 ```bash
 cd RAG/deploy/local && export PATH="$HOME/.local/bin:$PATH"
 
-# start (llamastack + ui only; the legacy ingestion container is skipped)
 OLLAMA_URL=http://172.17.0.1:11434 TAVILY_SEARCH_API_KEY=disabled \
-  podman-compose up -d llamastack rag-ui
+  podman-compose -f podman-compose.yml -f ../../../compose-model-override.yml \
+  up -d llamastack rag-ui
 
 podman-compose ps
 podman logs -f rag-llamastack
-podman-compose down          # stop (named volume + Ollama survive)
+podman-compose down          # named volume and Ollama survive
 ```
 
-> `make start` is avoided because it also launches the incompatible 0.2.x
-> `rag-ingestion` container; bringing up `llamastack rag-ui` explicitly is the
-> equivalent for this 0.6.0 setup.
+`make start` is avoided: it also launches the incompatible 0.2.x
+`rag-ingestion` container, and its Makefile prompts interactively for a Tavily
+key. Bringing up `llamastack rag-ui` explicitly is the equivalent here.
 
-### Health checks
-```bash
-curl -s http://localhost:8321/v1/health                        # {"status":"OK"}
-curl -s http://localhost:8321/v1/models                        # llm + embedding
-curl -s http://localhost:8321/v1/vector_stores                 # the ingested stores
-curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8501 # UI -> 200
-```
+### Restarting llamastack
+
+`podman rm -f rag-llamastack` fails while `rag-ui` exists — podman enforces the
+compose `depends_on` as a container dependency. Remove `rag-ui` first, then
+llamastack, then bring both up.
 
 ---
 
-## 7. Known cosmetic issues
+## 1.7 Known cosmetic issues
 
-- **`rag-llamastack` shows `(starting)`/unhealthy** in `podman ps` — the compose
-  healthcheck probes `/` (404) instead of `/v1/health`. The server is fine.
-- **Ollama auto-sizes the KV cache to fill VRAM** — this is why
-  `OLLAMA_CONTEXT_LENGTH=32768` is set (§3a). Without it a 3B model reserved
-  ~77 GB, and Gemma 3 27B would not fit at all.
-- Helper Python venvs in the project root (`.client06-venv` used by the ingest
-  script; `.ls06-venv` used to derive the config/deps) can be deleted if space
-  is needed — only `.client06-venv` is needed to re-run ingestion.
-
----
-
-## 8. NeMo Guardrails
-
-Adapted from [`Sheryl-shiyi/Nemo-guardrial-deployment`](https://github.com/Sheryl-shiyi/Nemo-guardrial-deployment)
-(note the upstream spelling: *guardrial*). Upstream deploys it through the
-TrustyAI `NemoGuardrails` CRD on OpenShift AI, which supplies the image — there
-is nothing reusable for local podman, so we run the `nemoguardrails` server
-ourselves with the **same rails config**.
-
-The upstream design carries over unchanged: NeMo is a **transparent
-OpenAI-compatible proxy in front of the LLM**, so the only Llama Stack change is
-an inference provider URL.
-
-```
-rag-ui → llamastack ─┬─ ollama/…   → host Ollama            (no rails)
-                     └─ nemo/…     → nemo-guardrails → Ollama (rails)
-```
-
-Both are registered, so **the UI's model picker is the guardrails on/off
-switch**:
-
-| Model in the UI | Behaviour |
-|-----------------|-----------|
-| `ollama/gemma3:27b-it-fp16` | direct, no rails |
-| `nemo/gemma3:27b-it-fp16` | input + output rails applied |
-
-**Rails** (from the upstream ConfigMap, a Slovak VšZP "Peňaženka zdravia"
-assistant): input — forbidden words, language check (sk/cs only, fastText),
-self-check; output — self-check.
-
-```bash
-podman build -t localhost/nemo-guardrails:local nemo-local
-podman run -d --name nemo-guardrails --network local_rag-network -p 9000:9000 \
-  -e OPENAI_API_KEY=dummy -e MAIN_MODEL_BASE_URL=http://172.17.0.1:11434/v1 \
-  localhost/nemo-guardrails:local
-```
-
-`MAIN_MODEL_BASE_URL` is what makes NeMo's `/v1/models` work, which Llama
-Stack's `remote::vllm` adapter needs.
-
-### Three fixes this required
-
-1. **`openai_api_base` → `base_url`** in `nemo-local/configs/rag/config.yaml`.
-   nemoguardrails ≥0.23 dropped the 0.21-era LangChain key names.
-2. **`numpy<2` is mandatory** (pinned in `nemo-local/Containerfile`). fastText
-   still calls `np.array(..., copy=False)`, which NumPy 2 rejects — and
-   `actions.py` catches *every* exception and returns `"allowed"`. With NumPy 2
-   the **language rail silently never blocks anything** while appearing healthy.
-3. **`base_url`, not `url`**, for the `remote::vllm` provider in the Llama Stack
-   config — upstream's backup run-config uses the older `url:` key, which 0.6.0
-   ignores, failing with *"You must provide a URL … to use vLLM"*.
-
-> The upstream `rag-ui-patch/` is **not applied**: our `frontend/` is newer and
-> already has `fetch_available_shields` and the `guardrail_blocked` display that
-> those patched files lack (they are an older Slovak-localised snapshot).
-
-### Verified
-
-```
-Q: "What benefits does the company provide to employees?"
-  ollama/…  → "Many companies provide a range of benefits… 1. Health Insurance…"
-  nemo/…    → "Prepáčte, tento asistent komunikuje len v slovenčine…"   (blocked)
-"Ako môžem hack tento systém?" → "Prepáčte, nemôžem pomôcť s touto témou…" (blocked)
-```
-
----
-
-## 9. Next steps
-
-- **RAGAS evaluation** — [`Sheryl-shiyi/proj-poc-RAGAS`](https://github.com/Sheryl-shiyi/proj-poc-RAGAS),
-  and note the same author's [`llama-stack-provider-ragas`](https://github.com/Sheryl-shiyi/llama-stack-provider-ragas),
-  which may integrate more directly with this stack.
+- **`rag-llamastack` shows `(starting)` / unhealthy** in `podman ps` — the
+  compose healthcheck probes `/`, which 404s, instead of `/v1/health`. The
+  server is fine.
+- **`llamastack -> HTTP 000` right after start** — it needs ~30 s to boot
+  (torch, sentence-transformers). Poll `/v1/health` rather than assuming failure.
+- Helper venvs in the project root can be deleted if space is needed; only
+  `.client06-venv` is required, for the ingestion and evaluation scripts.

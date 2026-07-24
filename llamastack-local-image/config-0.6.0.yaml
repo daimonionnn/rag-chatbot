@@ -5,10 +5,14 @@ distro_name: starter
 # providers the frontend (llama-stack 0.6.0) actually uses: ollama inference,
 # sentence-transformers embeddings, faiss vector_io, localfs files + pypdf
 # processing, meta-reference agents (OpenAI responses/conversations), llama-guard
-# safety and the rag/websearch tool runtime. Dropped: the many remote inference
-# backends and the datasetio/eval/scoring/post_training/batches training stack.
+# safety and the rag/websearch tool runtime, plus the out-of-tree TrustyAI RAGAS
+# eval provider (+ datasetio/benchmarks it needs). Dropped: the many remote
+# inference backends and the scoring/post_training/batches training stack.
 apis:
 - agents
+- benchmarks
+- datasetio
+- eval
 - file_processors
 - files
 - inference
@@ -85,6 +89,27 @@ providers:
     provider_type: inline::rag-runtime
   - provider_id: model-context-protocol
     provider_type: remote::model-context-protocol
+  # RAGAS evaluation as an out-of-tree provider (TrustyAI). Enabled only when
+  # EMBEDDING_MODEL is set, mirroring the provider's own sample distribution.
+  # `module:` is how llama-stack loads an external provider from a pip package.
+  eval:
+  - provider_id: ${env.EMBEDDING_MODEL:+trustyai_ragas_inline}
+    provider_type: inline::trustyai_ragas
+    module: llama_stack_provider_ragas.inline
+    config:
+      embedding_model: ${env.EMBEDDING_MODEL}
+      kvstore:
+        namespace: ragas
+        backend: kv_default
+  # Local JSON/CSV eval datasets. The provider's sample distro also wires the
+  # remote::huggingface datasetio; omitted here since our eval data is local.
+  datasetio:
+  - provider_id: localfs
+    provider_type: inline::localfs
+    config:
+      kvstore:
+        namespace: datasetio::localfs
+        backend: kv_default
 storage:
   backends:
     kv_default:
@@ -122,6 +147,16 @@ registered_resources:
     provider_id: nemo
     provider_model_id: ${env.INFERENCE_MODEL:=gemma3:27b-it-fp16}
     model_type: llm
+  # Matches the original PoC's embedding (presentation: "Qwen3-4B, dim=2560").
+  # Strongly multilingual, unlike all-MiniLM-L6-v2 which is English-centric and
+  # weak on Slovak. Served by Ollama, so it needs no extra in-process deps.
+  - model_id: qwen3-embedding:4b-fp16
+    provider_id: ollama
+    provider_model_id: qwen3-embedding:4b-fp16
+    model_type: embedding
+    metadata:
+      embedding_dimension: 2560
+  # Kept registered so the older 384-dim FantaCo vector stores stay usable.
   - model_id: all-MiniLM-L6-v2
     provider_id: sentence-transformers
     provider_model_id: sentence-transformers/all-MiniLM-L6-v2
@@ -143,11 +178,12 @@ server:
 vector_stores:
   default_provider_id: faiss
   default_embedding_model:
-    provider_id: sentence-transformers
-    model_id: sentence-transformers/all-MiniLM-L6-v2
+    provider_id: ollama
+    model_id: qwen3-embedding:4b-fp16
+  # Chunking matched to the original PoC: 512 tokens, overlap 64.
   file_ingestion_params:
     default_chunk_size_tokens: 512
-    default_chunk_overlap_tokens: 128
+    default_chunk_overlap_tokens: 64
   chunk_retrieval_params:
     chunk_multiplier: 5
     max_tokens_in_context: 4000

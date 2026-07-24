@@ -37,6 +37,17 @@ RUN uv pip install --no-cache sentence-transformers --no-deps
 # incompatible with 0.6.0 (ImportError on `agents`). Pin all three explicitly.
 RUN uv pip install --no-cache \
         'llama-stack==0.6.0' 'llama-stack-api==0.6.0' 'llama-stack-client==0.6.0'
+
+# RAGAS as an out-of-tree eval provider (TrustyAI). Provider 0.7.0 is the release
+# that targets llama-stack 0.6.x, so it matches this image exactly. The
+# llama-stack trio is re-pinned in the same command so the resolver cannot drift
+# it while satisfying ragas' own bounds. greenlet is pinned because the provider
+# documents inline/files/localfs failing with "greenlet not found" without it.
+RUN uv pip install --no-cache \
+        'llama-stack-provider-ragas==0.7.0' \
+        'greenlet==3.2.4' \
+        'langchain-community>=0.3,<0.4' \
+        'llama-stack==0.6.0' 'llama-stack-api==0.6.0' 'llama-stack-client==0.6.0'
 RUN pip uninstall -y uv
 
 # Fix non-latin-1 (e.g. Slovak č/š/ž) filenames silently failing to ingest:
@@ -44,6 +55,11 @@ RUN pip uninstall -y uv
 # forbids for non-latin-1. See the script's docstring for the full story.
 COPY patch-content-disposition.py /tmp/patch-content-disposition.py
 RUN python /tmp/patch-content-disposition.py && rm /tmp/patch-content-disposition.py
+
+# Fix the RAGAS provider's sync->async embedding bridge, which otherwise fails
+# every embeddings-based metric with "This event loop is already running".
+COPY patch-ragas-embeddings-loop.py /tmp/patch-ragas-embeddings-loop.py
+RUN python /tmp/patch-ragas-embeddings-loop.py && rm /tmp/patch-ragas-embeddings-loop.py
 
 COPY config-0.6.0.yaml /app/config.yaml
 

@@ -3,9 +3,14 @@
 #   git clone https://github.com/Sheryl-shiyi/Nemo-guardrial-deployment nemo-guardrails
 RAG/
 nemo-guardrails/
+ragas-poc/
+ragas-provider/
 
 # Internal documents — kept locally, never committed
 docs/
+
+# Evaluation artefacts: generated, and derived from the internal docs above
+rag-eval/results/
 
 # Local runtime logs
 *.log

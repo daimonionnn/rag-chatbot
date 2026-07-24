@@ -95,30 +95,32 @@ internal documents).
 
 ### Metrics
 
-Five of the PoC's six work:
+All six of the PoC's metrics, once the provider is patched:
 
 ```
-faithfulness · answer_relevancy · context_precision · context_recall · answer_similarity
+faithfulness · answer_relevancy · context_precision · context_recall
+answer_similarity · factual_correctness
 ```
 
-`answer_correctness` no longer exists in ragas 0.4.x, and its successor
-`factual_correctness` is unusable through this provider — see [BUGS.md](BUGS.md).
-Override the set with `METRICS=a,b,c`.
+`answer_correctness` no longer exists in ragas 0.4.x; `factual_correctness` is
+its successor and needed a provider fix to work at all — ragas keys ModeMetric
+scores as `factual_correctness(mode=f1)` while the provider looked them up by
+the bare name (see [BUGS.md](BUGS.md)). Override the set with `METRICS=a,b,c`.
 
 ---
 
 ## 3.4 Cost
 
-Measured: **~13.5 s per (row, metric)** for scoring, and ~7 s per question for
+Measured: **~15–17 s per (row, metric)** for scoring, and ~7 s per question for
 generation.
 
 | Scope | Wall clock |
 |-------|-----------|
 | generation, 182 questions, one model | ~21 min |
-| scoring, 182 rows × 5 metrics, one model | ~3.4 h |
-| **full run, one model** | **~3.8 h** |
-| full run, three models | ~11–12 h |
-| 40-question subset, three models | ~2.5 h |
+| scoring, 182 rows × 6 metrics, one model | ~5 h |
+| **full run, one model** | **~5.3 h** |
+| full run, three models | **~16 h** |
+| 40-question subset, three models | ~3.5 h |
 
 The judge and the model under test are usually different, so Ollama swaps them
 once per model (~30 s). The embedding model (8 GB) stays resident alongside the
@@ -136,7 +138,8 @@ Two rows, gemma3 generating and judging, to prove the pipeline end to end:
 | context_precision | 1.000 |
 | context_recall | 1.000 |
 | answer_similarity | 0.975 |
-| answer_relevancy | 0.665 |
+| answer_relevancy | 0.673 |
+| factual_correctness | 0.665 |
 
 Two rows prove nothing about quality — they prove the wiring. The high
 context scores are consistent with the near-exact retrieval noted above; the

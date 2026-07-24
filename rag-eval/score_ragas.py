@@ -33,20 +33,17 @@ from llama_stack_client import LlamaStackClient
 BASE_URL = "http://localhost:8321"
 PROVIDER_ID = "trustyai_ragas_inline"
 DEFAULT_JUDGE = "ollama/gemma3:27b-it-fp16"
-# Five of the upstream PoC's six metrics. Two naming/compat notes:
-#  * `answer_correctness` does not exist in ragas 0.4.x; its successor is
-#    `factual_correctness`, but that one CANNOT be used here — ragas names its
-#    result column with the mode appended (e.g. "factual_correctness(mode=f1)")
-#    while the provider looks the column up by the bare metric name, so the job
-#    dies with KeyError: 'factual_correctness'.
-#  * everything else below is verified working.
-# Override with METRICS=a,b,c to run a subset.
+# The upstream PoC's six metrics. `answer_correctness` no longer exists in
+# ragas 0.4.x — `factual_correctness` is its successor, and it needs the
+# ModeMetric key fix patched into the provider (see BUGS.md) or the job dies
+# with KeyError. Override with METRICS=a,b,c to run a subset.
 DEFAULT_METRICS = [
     "faithfulness",
     "answer_relevancy",
     "context_precision",
     "context_recall",
     "answer_similarity",
+    "factual_correctness",
 ]
 METRICS = [m.strip() for m in os.environ["METRICS"].split(",")] \
     if os.environ.get("METRICS") else DEFAULT_METRICS

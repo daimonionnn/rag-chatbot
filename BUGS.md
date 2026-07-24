@@ -9,9 +9,13 @@ Two patterns account for most of the time spent:
    dependency with no version bound. They were correct on the day they were
    released and resolve to something incompatible today. Six separate failures
    below are this.
-2. **Silently swallowed exceptions.** Three failures reported *success* or
-   *empty error* while doing nothing. These are the expensive ones: nothing looks
-   broken, so you only find them by checking that the feature actually works.
+2. **Silently swallowed exceptions.** Two failures reported *success* or an
+   *empty error* while doing nothing at all. These are the expensive ones:
+   nothing looks broken, so you only find them by checking that the feature
+   actually does its job.
+
+Every defect in section A is fixed by a build-time patch, so the full upstream
+feature set — including all six RAGAS metrics — is available.
 
 ---
 
@@ -71,7 +75,35 @@ captures the loop at construction and submits coroutines with
 `asyncio.run_coroutine_threadsafe` — the correct primitive for calling into a
 loop from another thread.
 
-Both patches are idempotent and **fail the build** if the upstream source no
+### A3. `factual_correctness` kills the eval job
+
+Same file, the result-collection loop:
+
+```python
+for metric_name in [m.name for m in metrics]:
+    metric_scores = result[metric_name]
+```
+
+ragas does not always key scores by the bare metric name (`ragas/evaluation.py`):
+
+```python
+if isinstance(m, ModeMetric):
+    key = f"{m.name}(mode={m.mode})"
+else:
+    key = m.name
+```
+
+`FactualCorrectness` is a `ModeMetric` with `mode="f1"`, so its real key is
+`factual_correctness(mode=f1)` and the whole job dies with
+`KeyError: 'factual_correctness'`. Purely a naming-convention mismatch — the
+metric itself is fine.
+
+**Fix:** [`llamastack-local-image/patch-ragas-mode-metrics.py`](llamastack-local-image/patch-ragas-mode-metrics.py)
+resolves the key the way ragas wrote it (bare name → `<name>(mode=…)` → any
+`<name>(…)`) while still reporting under the bare name. This recovers the sixth
+metric, so the full PoC metric set is available.
+
+All three patches are idempotent and **fail the build** if the upstream source no
 longer matches, so they cannot silently lapse across an upgrade.
 
 ---
@@ -131,7 +163,6 @@ why that attempt was abandoned in favour of aligning to 0.6.0.
 | D5 | `nemoguardrails` refuses the config: "0.21-style LangChain conventions" | ≥0.23 renamed `openai_api_base` → `base_url` | rename the key |
 | D6 | NeMo `/v1/models` returns `MAIN_MODEL_BASE_URL is not set`, breaking llama-stack's model listing | that endpoint needs the upstream base URL in the environment | set `MAIN_MODEL_BASE_URL` |
 | D7 | NeMo returns `Internal server error`; log shows `model 'rag' not found` | the `model` field of a chat request is forwarded to Ollama; passing the *config id* there is wrong | pass the real model name; the config comes from `--default-config-id` |
-| D8 | eval job dies with `KeyError: 'factual_correctness'` | ragas names the result column `factual_correctness(mode=f1)` while the provider looks it up by the bare metric name | metric unusable; five of six remain |
 | D9 | `Unknown metric: answer_correctness` (warning, then a failing job) | renamed in ragas 0.4.x | use the current names |
 
 ---

@@ -61,6 +61,11 @@ RUN python /tmp/patch-content-disposition.py && rm /tmp/patch-content-dispositio
 COPY patch-ragas-embeddings-loop.py /tmp/patch-ragas-embeddings-loop.py
 RUN python /tmp/patch-ragas-embeddings-loop.py && rm /tmp/patch-ragas-embeddings-loop.py
 
+# Recover factual_correctness: ragas keys ModeMetric scores as "<name>(mode=…)"
+# but the provider looks them up by the bare name, killing the job with KeyError.
+COPY patch-ragas-mode-metrics.py /tmp/patch-ragas-mode-metrics.py
+RUN python /tmp/patch-ragas-mode-metrics.py && rm /tmp/patch-ragas-mode-metrics.py
+
 COPY config-0.6.0.yaml /app/config.yaml
 
 # The frontend client and this server are both 0.6.0, but keep the check off so

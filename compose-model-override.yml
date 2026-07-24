@@ -1,0 +1,11 @@
+# Overrides the model hardcoded in the upstream compose file
+# (RAG/deploy/local/podman-compose.yml sets INFERENCE_MODEL: llama3.2:3b-instruct-fp16),
+# so the upstream file itself stays untouched.
+#
+# Usage — from RAG/deploy/local:
+#   podman-compose -f podman-compose.yml -f ../../../compose-model-override.yml \
+#       up -d llamastack rag-ui
+services:
+  llamastack:
+    environment:
+      INFERENCE_MODEL: "gemma3:27b-it-fp16"

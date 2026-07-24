@@ -15,7 +15,8 @@ a chatbot that actually works.
 > # 2. the local Llama Stack image must exist (see §3)
 > cd RAG/deploy/local && export PATH="$HOME/.local/bin:$PATH"
 > OLLAMA_URL=http://172.17.0.1:11434 TAVILY_SEARCH_API_KEY=disabled \
->   podman-compose up -d llamastack rag-ui
+>   podman-compose -f podman-compose.yml -f ../../../compose-model-override.yml \
+>     up -d llamastack rag-ui
 > # 3. load demo data once (see §4):  .client06-venv/bin/python ingest-0.6.0.py
 > ```
 > Then open **http://localhost:8501**.
@@ -47,7 +48,7 @@ API. The UI is used unchanged.
 ```
               host (Linux, NVIDIA RTX PRO 6000 Blackwell, 96 GB VRAM)
   ┌──────────────────────────────────────────────────────────────────┐
-  │  ollama serve  (0.0.0.0:11434)  ──GPU──> llama3.2:3b-instruct-fp16 │
+  │  ollama serve  (0.0.0.0:11434)  ──GPU──> gemma3:27b-it-fp16 (55 GB)│
   └───────────────▲──────────────────────────────────────────────────┘
                   │ OLLAMA_URL=http://172.17.0.1:11434  (+ /v1 appended)
    rootless podman network `local_rag-network`
@@ -84,7 +85,7 @@ No root:
 ```bash
 uv tool install podman-compose                       # ~/.local/bin/podman-compose
 curl -fsSL https://ollama.com/install.sh | sudo sh   # Ollama + CUDA runtime
-ollama pull llama3.2:3b-instruct-fp16
+ollama pull gemma3:27b-it-fp16     # 55 GB, full precision
 ```
 `uv`, `docker` and the NVIDIA driver (v595 / CUDA 13.2, needed for Blackwell)
 were already present.
@@ -99,13 +100,49 @@ short-name-mode = "permissive"
 podman login docker.io      # a Docker Hub account is required to pull python:3.12-slim etc.
 ```
 
+### 3a. The LLM: Gemma 3 27B at full precision
+
+`gemma3:27b-it-fp16` — 54 GB of weights. Ollama has **no `bf16` tag for 27b**
+(only for 270m); `-fp16` is the unquantized 16-bit build, the equivalent choice.
+`gemma3:27b-it-q8_0` (30 GB) is the fallback if VRAM ever gets tight.
+
+**Cap the context or it will not fit.** Ollama 0.32 auto-sizes the KV cache to
+fill available VRAM (it picked a 256K context and reserved ~77 GB for a mere 3B
+model). With 54 GB of weights that would OOM, so the server runs with
+`OLLAMA_CONTEXT_LENGTH=32768` — far more than this RAG needs
+(`max_tokens_in_context` is 4000). Measured after the change:
+
+| | |
+|---|---|
+| VRAM in use | **56.5 GB / 95.6 GB** |
+| Context | 32768 |
+| Cold load | ~11 s |
+
+#### ⚠️ Gemma 3 does not support tool calling
+
+```
+$ ollama show gemma3:27b-it-fp16        → capabilities: completion, vision
+$ ollama show llama3.2:3b-instruct-fp16 → capabilities: completion, tools
+```
+
+So the UI's **Agent mode** — and any `responses` call with a `file_search`
+tool — fails against Gemma 3 with
+`500 … gemma3:27b-it-fp16 does not support tools`.
+
+**Direct RAG mode is unaffected** (`vector_stores.search` + a normal chat
+completion with the retrieved context) and gives markedly better answers than
+the old 3B model. `llama3.2:3b-instruct-fp16` is still pulled and registered, so
+Agent mode remains available by switching model in the UI. To get both quality
+*and* tool calling, a tools-capable large model (e.g. `qwen3:32b`,
+`llama3.3:70b`) would have to be pulled instead.
+
 ### 2b. Ollama must listen on all interfaces
 The stock systemd unit binds `127.0.0.1`, unreachable from rootless containers.
 Run it on `0.0.0.0`:
 ```bash
 sudo systemctl stop ollama
-OLLAMA_HOST=0.0.0.0:11434 OLLAMA_KEEP_ALIVE=60m nohup ollama serve \
-    > ~/development/rag-chatbot/ollama-serve.log 2>&1 &
+OLLAMA_HOST=0.0.0.0:11434 OLLAMA_KEEP_ALIVE=60m OLLAMA_CONTEXT_LENGTH=32768 \
+    nohup ollama serve > ~/development/rag-chatbot/ollama-serve.log 2>&1 &
 ```
 
 ---
@@ -228,9 +265,9 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8501 # UI -> 200
 
 - **`rag-llamastack` shows `(starting)`/unhealthy** in `podman ps` — the compose
   healthcheck probes `/` (404) instead of `/v1/health`. The server is fine.
-- **Large VRAM use for a 3B model** — Ollama 0.32 auto-sizes the KV cache to the
-  95 GB VRAM (~77 GB reserved). Cap with `OLLAMA_CONTEXT_LENGTH` if VRAM is
-  needed elsewhere (e.g. when adding NeMo Guardrails).
+- **Ollama auto-sizes the KV cache to fill VRAM** — this is why
+  `OLLAMA_CONTEXT_LENGTH=32768` is set (§3a). Without it a 3B model reserved
+  ~77 GB, and Gemma 3 27B would not fit at all.
 - Helper Python venvs in the project root (`.client06-venv` used by the ingest
   script; `.ls06-venv` used to derive the config/deps) can be deleted if space
   is needed — only `.client06-venv` is needed to re-run ingestion.
@@ -259,8 +296,8 @@ switch**:
 
 | Model in the UI | Behaviour |
 |-----------------|-----------|
-| `ollama/llama3.2:3b-instruct-fp16` | direct, no rails |
-| `nemo/llama3.2:3b-instruct-fp16` | input + output rails applied |
+| `ollama/gemma3:27b-it-fp16` | direct, no rails |
+| `nemo/gemma3:27b-it-fp16` | input + output rails applied |
 
 **Rails** (from the upstream ConfigMap, a Slovak VšZP "Peňaženka zdravia"
 assistant): input — forbidden words, language check (sk/cs only, fastText),

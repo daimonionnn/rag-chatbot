@@ -8,7 +8,7 @@ models:
       # nemoguardrails >=0.23 dropped the 0.21-era LangChain key name:
       # `openai_api_base` is now `base_url` for OpenAI-compatible endpoints.
       base_url: "http://172.17.0.1:11434/v1"
-      model_name: "llama3.2:3b-instruct-fp16"
+      model_name: "gemma3:27b-it-fp16"
 
 enable_multi_step_generation: false
 

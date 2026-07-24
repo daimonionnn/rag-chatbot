@@ -113,14 +113,14 @@ storage:
       backend: kv_default
 registered_resources:
   models:
-  - model_id: ${env.INFERENCE_MODEL:=llama3.2:3b-instruct-fp16}
+  - model_id: ${env.INFERENCE_MODEL:=gemma3:27b-it-fp16}
     provider_id: ollama
     model_type: llm
   # Guardrailed variant of the same model. Shows up as
-  # `nemo/llama3.2:3b-instruct-fp16` next to `ollama/llama3.2:3b-instruct-fp16`.
-  - model_id: ${env.INFERENCE_MODEL:=llama3.2:3b-instruct-fp16}
+  # `nemo/<model>` next to `ollama/<model>` in the UI's model picker.
+  - model_id: ${env.INFERENCE_MODEL:=gemma3:27b-it-fp16}
     provider_id: nemo
-    provider_model_id: ${env.INFERENCE_MODEL:=llama3.2:3b-instruct-fp16}
+    provider_model_id: ${env.INFERENCE_MODEL:=gemma3:27b-it-fp16}
     model_type: llm
   - model_id: all-MiniLM-L6-v2
     provider_id: sentence-transformers

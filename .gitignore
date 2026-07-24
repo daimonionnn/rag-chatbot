@@ -1,0 +1,14 @@
+# Upstream blueprint — cloned separately, not vendored here:
+#   git clone https://github.com/Sheryl-shiyi/RAG
+RAG/
+
+# Internal documents — kept locally, never committed
+docs/
+
+# Local runtime logs
+*.log
+
+# Python venvs (uv drops its own .gitignore inside each; listed for clarity)
+.client06-venv/
+.ls06-venv/
+.llamastack-venv/

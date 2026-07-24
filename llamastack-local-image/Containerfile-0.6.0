@@ -1,0 +1,47 @@
+# Llama Stack 0.6.0 server for the RAG chatbot, backed by host Ollama.
+#
+# WHY 0.6.0 (and not the compose's 0.2.9): the repo's frontend pins
+# llama-stack-client==0.6.0 and uses the OpenAI-compatible surface
+# (vector_stores / responses / conversations / chat.completions) that only
+# exists from 0.6.0 onward. The compose image tag (0.2.9) predates those APIs,
+# so the UI got HTTP 404 against a real 0.2.9 server. This image aligns the
+# server to the UI's version. It is tagged as the compose's
+# `llamastack/distribution-ollama:0.2.9` so podman-compose.yml stays unchanged.
+#
+# Build:
+#   podman build -f llamastack-local-image/Containerfile-0.6.0 \
+#     -t docker.io/llamastack/distribution-ollama:0.2.9 llamastack-local-image
+FROM python:3.12-slim
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl git gcc g++ && rm -rf /var/lib/apt/lists/*
+
+ENV UV_SYSTEM_PYTHON=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONUNBUFFERED=1
+RUN pip install uv
+
+# Provider dependencies for the trimmed config (from `llama stack list-deps`).
+RUN uv pip install --no-cache \
+        pandas pillow 'mcp>=1.23.0' aiosqlite matplotlib psycopg2-binary 'h11>=0.16.0' \
+        sentencepiece 'nltk>=3.9.3' scipy pymongo aiohttp chardet asyncpg numpy ollama \
+        faiss-cpu tokenizers 'sqlalchemy[asyncio]' safetensors scikit-learn 'pypdf>=6.7.2' \
+        requests tqdm transformers redis 'fonttools>=4.60.2' einops fastapi fire httpx \
+        uvicorn opentelemetry-sdk opentelemetry-exporter-otlp-proto-http
+RUN uv pip install --no-cache torch torchvision 'torchao>=0.12.0' \
+        --extra-index-url https://download.pytorch.org/whl/cpu
+RUN uv pip install --no-cache sentence-transformers --no-deps
+# Pin the whole llama-stack trio to 0.6.0. llama-stack declares llama-stack-api
+# UNPINNED, so an unpinned install pulls a newer api package that is ABI-
+# incompatible with 0.6.0 (ImportError on `agents`). Pin all three explicitly.
+RUN uv pip install --no-cache \
+        'llama-stack==0.6.0' 'llama-stack-api==0.6.0' 'llama-stack-client==0.6.0'
+RUN pip uninstall -y uv
+
+COPY config-0.6.0.yaml /app/config.yaml
+
+# The frontend client and this server are both 0.6.0, but keep the check off so
+# a slightly different client patch version can still connect.
+ENV LLAMA_STACK_DISABLE_VERSION_CHECK=1
+ENTRYPOINT ["llama", "stack", "run", "/app/config.yaml"]

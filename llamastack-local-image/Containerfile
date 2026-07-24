@@ -1,0 +1,58 @@
+# Local rebuild of llamastack/distribution-ollama:0.2.9
+#
+# The upstream image referenced by deploy/local/podman-compose.yml
+# (docker.io/llamastack/distribution-ollama:0.2.9) is in a PRIVATE Docker Hub
+# namespace and cannot be pulled anonymously or with a standard account.
+#
+# This Containerfile reproduces that image locally. It mirrors exactly what
+# `llama stack build --template ollama --image-type container` generates
+# (which is how the official image is produced), with two deliberate changes:
+#   1. llama-stack is PINNED to ==0.2.9 so the server API matches the version
+#      the RAG repo targets (the generator leaves it unpinned, which would pull
+#      the latest 0.7.x and break the 0.2.x server entrypoint below).
+#   2. sentence-transformers is added explicitly so the all-MiniLM-L6-v2
+#      embedding model used by the ingestion pipeline is always available.
+#
+# Build & tag it to satisfy the compose file unchanged:
+#   podman build -t docker.io/llamastack/distribution-ollama:0.2.9 llamastack-local-image
+FROM python:3.10-slim
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+        iputils-ping net-tools iproute2 dnsutils \
+        curl wget git \
+        procps psmisc lsof \
+        traceroute \
+        bubblewrap \
+        gcc \
+        && rm -rf /var/lib/apt/lists/*
+
+ENV UV_SYSTEM_PYTHON=1
+RUN pip install uv
+RUN uv pip install --no-cache torch faiss-cpu aiosqlite autoevals blobfile scipy \
+        opentelemetry-sdk peft pillow pythainlp matplotlib chardet pymongo nltk openai \
+        tree_sitter sentencepiece pandas transformers sentence-transformers chromadb-client \
+        psycopg2-binary aiohttp scikit-learn emoji datasets \
+        opentelemetry-exporter-otlp-proto-http mcp requests redis langdetect tqdm ollama \
+        pypdf numpy "sqlalchemy[asyncio]" trl aiosqlite fastapi fire httpx uvicorn
+# Allows running as non-root user
+RUN mkdir -p /.llama/providers.d /.cache
+RUN uv pip install --no-cache "llama-stack==0.2.9"
+# Force a modern datasets compatible with the resolved pyarrow. The unpinned
+# resolver above backtracks `datasets` to an ancient 1.1.1 that imports the
+# long-removed `pyarrow.PyExtensionType`, which crashes the server at startup
+# (the huggingface datasetio provider is loaded during stack construction).
+RUN uv pip install --no-cache "datasets>=3.0.0"
+RUN pip uninstall -y uv
+# Use a trimmed run config instead of the stock `--template ollama` so the
+# eval/scoring/datasetio/post_training providers (and their heavy training
+# deps) are never loaded. See run.yaml for the rationale.
+COPY run.yaml /app/run.yaml
+# The repo's frontend pins llama-stack-client==0.6.0 while this server is 0.2.9,
+# so the server's version-check middleware would reject the UI with HTTP 426.
+# Disable that check (the repo ships this exact client/server mix and offers no
+# other reconciliation).
+ENV LLAMA_STACK_DISABLE_VERSION_CHECK=1
+ENTRYPOINT ["python", "-m", "llama_stack.distribution.server.server", "--config", "/app/run.yaml"]
+
+RUN chmod -R g+rw /app /.llama /.cache

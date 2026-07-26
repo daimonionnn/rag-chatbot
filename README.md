@@ -119,8 +119,10 @@ llamastack-local-image/   the Llama Stack 0.6.0 image we build, its run config,
 nemo-local/              the NeMo Guardrails server image and its rails config
 rag-eval/                RAGAS harness (run_rag.py -> score_ragas.py)
 ingest-0.6.0.py          document ingestion via the 0.6.0 Files/Vector-Stores API
-compose-model-override.yml  overrides the model hardcoded upstream, leaving the
-                            upstream compose file untouched
+compose-model-override.yml  overrides the model hardcoded upstream, and applies
+                            patch-max-tokens-slider.py to rag-ui at container
+                            start — the RAG/ clone itself is never touched
+patch-max-tokens-slider.py  fixes the UI's "Max Tokens" slider (see BUGS.md D10)
 fetch-upstream.sh        clones the four repos below, pinned to verified commits
 start-stack.sh           starts host Ollama + nemo-guardrails + llamastack/rag-ui;
                         idempotent, safe to re-run any time

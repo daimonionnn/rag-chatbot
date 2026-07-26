@@ -13,3 +13,22 @@ services:
       # (`${env.EMBEDDING_MODEL:+trustyai_ragas_inline}`) and uses it as the
       # embedding model for the similarity-based metrics.
       EMBEDDING_MODEL: "ollama/qwen3-embedding:4b-fp16"
+  rag-ui:
+    # Raises the "Max Tokens" sampling-parameter slider's ceiling (and fixes
+    # it actually being reachable — see patch-max-tokens-slider.py). Applied at
+    # container start, not baked into the image, so it survives an upstream
+    # image rebuild and never touches the RAG/ clone itself.
+    # Absolute path: podman-compose resolves a relative source here against
+    # the BASE compose file's directory (RAG/deploy/local), not this file's
+    # own directory — a relative path silently mounted an auto-created empty
+    # directory there instead of erroring (see BUGS.md).
+    volumes:
+      - /home/matt/development/rag-chatbot/patch-max-tokens-slider.py:/tmp/patch-max-tokens-slider.py:ro
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        python /tmp/patch-max-tokens-slider.py &&
+        exec python -m streamlit run
+        /app/llama_stack_ui/distribution/ui/app.py
+        --server.port=8501 --server.address=0.0.0.0

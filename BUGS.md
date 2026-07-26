@@ -164,6 +164,7 @@ why that attempt was abandoned in favour of aligning to 0.6.0.
 | D6 | NeMo `/v1/models` returns `MAIN_MODEL_BASE_URL is not set`, breaking llama-stack's model listing | that endpoint needs the upstream base URL in the environment | set `MAIN_MODEL_BASE_URL` |
 | D7 | NeMo returns `Internal server error`; log shows `model 'rag' not found` | the `model` field of a chat request is forwarded to Ollama; passing the *config id* there is wrong | pass the real model name; the config comes from `--default-config-id` |
 | D9 | `Unknown metric: answer_correctness` (warning, then a failing job) | renamed in ragas 0.4.x | use the current names |
+| D10 | UI's "Max Tokens" slider cannot reach its own labelled maximum — stops at 4033, not 4096 | `st.slider(label, min, max, value, step)` only produces values reachable by stepping from `min`; upstream's `(1, 4096, 512, 64)` reaches at most `1 + 63*64 = 4033`, since the next step (4097) exceeds `max` | pick a range where `max` is itself reachable by stepping from `min` — `(0, 8192, 4096, 64)` (patched at container start, not in the RAG/ clone — see `patch-max-tokens-slider.py`) |
 
 ---
 
@@ -182,6 +183,7 @@ why that attempt was abandoned in favour of aligning to 0.6.0.
 | E9 | podman `depends_on` blocks removal | `podman rm -f rag-llamastack` fails while `rag-ui` exists; remove dependents first |
 | E10 | `pkill -f` can kill its own shell | the pattern appears in the invoking command's own argv, so `pkill -f "ollama pull"` matched and killed the shell running it. Use a port (`fuser -k`) or a regex that cannot self-match |
 | E11 | one stopped container breaks a subset of models with no local clue | `nemo-guardrails` was stopped (with everything else) to free VRAM for a benchmark, then only `llamastack`/`rag-ui` were restarted afterward. Ollama and every `ollama/*` model worked fine; every `nemo/*` model in the UI answered `HTTP 500` with nothing in the chatbot's own logs pointing at "the guardrails container isn't running" — the failure surfaces one layer away from its cause. Fixed by `./start-stack.sh` (repo root), which starts all four pieces together and is safe to re-run any time |
+| E12 | a relative bind-mount `source:` in a compose *override* file resolves against the wrong directory | `compose-model-override.yml` (repo root) declared `volumes: [./patch-max-tokens-slider.py:...]`; podman-compose resolved `./` against the **base** compose file's directory (`RAG/deploy/local`), not the override file's own directory. The path didn't exist there, so podman silently bind-mounted an auto-created **empty directory** instead of erroring — the container then crash-looped on `python /tmp/patch-....py` with the distinctly unhelpful `can't find '__main__' module in '/tmp/patch-....py'` (Python's error for "this is a directory, not a script"). Worse, the empty directory was created *inside the pinned, gitignored `RAG/` clone*. Use an absolute path for bind-mount sources declared in an override file |
 
 ---
 

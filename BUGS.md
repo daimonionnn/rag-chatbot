@@ -134,6 +134,147 @@ English scores `blocked` (lang=en, conf 0.911) and Slovak `allowed`.
 failure was reported, but with no information, and the plausible-looking
 explanation (bad PDFs) was wrong.
 
+### B3. Agent-based mode answers from parametric memory instead of the documents
+
+The worst failure mode found in this project, because the answer looks right. In
+Agent-based mode the model is *offered* `file_search` and `web_search` and may
+simply not call them — and then answers from memory, with no indication in the
+UI that no document was ever retrieved. Asked `Kolko stoji zubna prehliadka?`
+with the `vszp` store attached, gemma4 produced a confident, well-formatted
+breakdown of Slovak dental prices that came entirely from the model.
+
+Measured per model, same question, same tools (`outputs` from `/v1/responses`):
+
+| Model                  | `file_search`                              | `web_search`                          |
+|------------------------|--------------------------------------------|---------------------------------------|
+| `gemma3:27b-it-fp16`   | HTTP 500, `does not support tools`         | HTTP 500, `does not support tools`    |
+| `gemma4:31b-it-bf16`   | 200, `['message']` — **tool never called** | 200, `['message']` — **never called** |
+| `qwen3.6:27b-mtp-bf16` | 200, `['file_search_call', 'message']`     | 200, `['web_search_call', 'message']` |
+
+Three distinct causes behind one symptom, so "agent mode is broken" is the wrong
+diagnosis:
+
+1. **gemma3 cannot do tool calling at all.** Ollama rejects the request outright,
+   which surfaces in the UI as `❌ Error: Error code: 500`. Since gemma3 is the
+   default `INFERENCE_MODEL`, this is what Agent-based mode does out of the box.
+2. **gemma4 accepts tools but does not use them** for this prompt — the silent
+   case above.
+3. **Web search needs a key that matches the configured provider.** With none,
+   the provider raises `401 Unauthorized` from `api.tavily.com`; the agent
+   swallows it and answers from memory anyway.
+
+**qwen3.6 calls the tool, but not reliably — and what decides is the question.**
+Repeating one identical request does not give one answer. Measured over `n=3` per
+variant, `file_search` offered every time, temperature 0.1:
+
+| Question                                         | Tool called |
+|--------------------------------------------------|------------:|
+| `Kolko stoji zubna prehliadka?`                  | 0/3         |
+| the same, system prompt + `Answer in Slovak.`    | 1/3         |
+| `Ake vyhody ponuka Penazenka zdravia od VSZP …?` | 3/3         |
+
+So the model retrieves when it judges that it *needs* to, and skips retrieval when
+the question looks like general knowledge. That is defensible behaviour in the
+abstract and precisely wrong for a RAG assistant: `Kolko stoji zubna prehliadka?`
+**does** have a specific answer in the VSZP corpus, and the model instead produced
+private-clinic price ranges from memory. The questions most likely to be answered
+without retrieval are exactly the ones where the corpus disagrees with general
+knowledge.
+
+**Fix / how to use it:** Agent-based mode is *not* an unfinished template — it is
+llama-stack's Responses API (`POST /v1/responses`, `inline::meta-reference` agents
+provider), the tool-calling loop runs server-side, and the retrieval it performs
+is real. But treat **`Direct` mode as the dependable path**: it retrieves
+*unconditionally* instead of leaving the decision to the model, which is why it is
+the mode the evaluation harness uses. For Agent-based mode, pick
+`qwen3.6:27b-mtp-bf16` (the only one of the three that calls tools at all) and
+read the `outputs` list, which is the only reliable evidence that retrieval
+happened: no `file_search_call` means the documents were not consulted, however
+plausible the text.
+
+Retrieval can also be *forced* rather than left to the model — the Responses API
+accepts `tool_choice`, which the UI never sends. That works, but only with the
+right tool name; the obvious spelling is a trap, see B6.
+
+### B4. Web search silently degrades to no search
+
+Two independent silent failures stack here. `builtin::websearch` binds to exactly
+one provider, and upstream binds it to `tavily-search`. A Brave key in
+`BRAVE_SEARCH_API_KEY` therefore changes nothing — the toolgroup still calls
+Tavily, still gets `401`, and the agent still answers from memory. Worse, the
+tool call is reported as `status="completed"` in the response, so the UI shows a
+web-search step that found nothing and says so nowhere.
+
+**Fix:** register the matching provider and point the toolgroup at it
+(`config-0.6.0.yaml`); both providers register their tool under the same name
+(`web_search`), so nothing above the provider layer changes. Verified with a live
+query returning real Slovak results. The key itself lives in the untracked
+`.env.local`, which `start-stack.sh` sources — see SETUP.md.
+
+### B5. Changing the web-search provider needs an unregister first
+
+Registry entries are **persisted** in the metadata store
+(`local_llamastack_data` volume, `distributions/starter/kvstore.db`), not derived
+from the config at each boot. Repointing `builtin::websearch` at a new provider
+therefore makes the server refuse to start:
+
+```
+ValueError: Object of type 'tool_group' and identifier 'builtin::websearch' already
+exists with conflicting field values: {'provider_id': ('brave-search', 'tavily-search')}
+```
+
+With `restart: on-failure:50` in the compose file, that presents as a
+crash-looping container rather than an obvious config error.
+
+**Fix:** unregister the stale entry before the switch —
+`DELETE /v1/toolgroups/builtin::websearch` (HTTP 204). Chicken-and-egg, because
+the server has to be running to accept the call and will not start against the
+new config: bring up a *temporary* container with the old `provider_id`
+(bind-mount a patched config over `/app/config.yaml`, same volume and network,
+different port), unregister there, then start the real one, which re-registers
+against the new provider. Editing `kvstore.db` by hand also works but is not
+worth the risk.
+
+### B6. Forcing retrieval with `tool_choice` silently disables it instead
+
+A genuine llama-stack defect, and the most treacherous shape a bug can take: the
+parameter whose entire purpose is to *guarantee* the tool runs is what stops it
+from running. Both obvious spellings are accepted, return HTTP 200, and produce a
+confident answer with no retrieval and no warning:
+
+| `tool_choice` | Tool called |
+|-----|----:|
+| `{"type": "file_search"}` | 0/2 |
+| `{"type": "allowed_tools", "mode": "required", … "file_search"}` | 0/2 |
+| `{"type": "allowed_tools", "mode": "required", … "knowledge_search"}` | **2/2** |
+
+The cause is a name mismatch inside `_process_tool_choice`
+(`providers/inline/agents/meta_reference/responses/streaming.py`). For a
+`file_search` choice it builds the allowed-tools entry as
+
+```python
+case "file_search":
+    final_tools.append({"type": "function", "function": {"name": "file_search"}})
+```
+
+but the tool actually offered to the model is named **`knowledge_search`** — that
+is the name the executor dispatches on, and the name in
+`_SERVER_SIDE_BUILTIN_TOOL_NAMES`. The allowed list is then applied as a filter:
+
+```python
+effective_tools = [t for t in self.ctx.chat_tools
+                   if t.get("function", {}).get("name") in allowed_tool_names]
+```
+
+Nothing matches `"file_search"`, so `effective_tools` comes out **empty** and the
+model is handed no tools at all. Asking for retrieval to be mandatory is
+therefore the one way to guarantee it cannot happen.
+
+**Workaround:** spell the tool `knowledge_search` in an explicit `allowed_tools`
+choice — verified 2/2, and one run called it twice. Not patched in this repo: the
+UI does not send `tool_choice` at all today, so nothing here hits the bug. It
+matters if the UI is ever changed to force retrieval (see H).
+
 ---
 
 ## C. Unpinned / drifted dependencies
@@ -278,6 +419,41 @@ per retrieved chunk), so a ceiling of 32000 would **never** fit, even at Top K=5
 and would make Ollama silently drop the retrieved chunks. Applied at container
 start by `patch-max-tokens-slider.py`.
 
+### D11. Every sidebar change wipes the chat history
+
+Changing the model, the processing mode, any sampling slider or the system prompt
+clears the whole conversation — so comparing two models on the same question, or
+raising Max Tokens after a truncated answer, is impossible without retyping it.
+
+Eight sidebar widgets are wired to a session-clearing callback: seven to
+`on_change=reset_agent`, plus the MCP selector to `on_reset`. `reset_agent()` is
+`st.session_state.clear()` followed by `st.cache_resource.clear()`, and it takes
+`messages` and `conversation_id` with it.
+
+Nothing depends on that reset. `ChatConfig` is rebuilt from the widgets on *every*
+rerun, so a changed setting takes effect on the next message either way; and no
+function in `chat.py` is decorated with `@st.cache_resource`, so the cache half
+clears nothing. Upstream itself already treats a full reset as unnecessary for the
+guardrail selectors, which use the narrower `reset_conversation()`.
+
+**Fix:** drop the eight callbacks (`patch-max-tokens-slider.py`).
+`Clear Chat & Reset Config` still calls `reset_agent()`, so starting over stays
+explicit. Two traps in doing it by text substitution:
+
+- Seven occurrences sit on their own line, but the System Prompt one is inline
+  among other kwargs. Deleting `, on_change=reset_agent,` from
+  `value=default_prompt, on_change=reset_agent, height=100` consumes **both**
+  commas, leaving `value=default_prompt height=100` — a `SyntaxError` that stops
+  the Chat page importing at all. Own-line matches take the whole line; inline
+  matches keep the separating comma.
+- `on_reset` is left as an accepted-but-unused parameter of
+  `render_toolgroup_selection` rather than removed from its signature *and* its
+  call site. Those two edits have to land together, and a half-applied pair calls
+  it with one argument too many, breaking Agent-based mode.
+
+The patch `ast.parse`s the result before writing and refuses to write otherwise,
+then asserts no callback survived — editing Python with a regex earns both.
+
 ---
 
 ## E. Environment and operational traps
@@ -370,7 +546,13 @@ directory was created *inside the pinned, gitignored `RAG/` clone*.
 - **Gemma 3 has no tool calling.** `ollama show` reports `completion, vision`
   only, so the UI's Agent mode and any `responses` call with a `file_search`
   tool fail with `500 … does not support tools`. Direct RAG is unaffected.
-  Gemma 4 31B and Qwen3.6 27B report `tools` (and `thinking`) and work.
+- **Advertising `tools` is not the same as using them.** Gemma 4 31B and
+  Qwen3.6 27B both report `tools` (and `thinking`), but only Qwen3.6 was
+  observed actually emitting tool calls. Gemma 4 accepted the tools and answered
+  without calling them in every attempt, and Qwen3.6 calls them only when it
+  judges the question to need them — measured rates in B3. The capability flag
+  says a request will not be *rejected*; it says nothing about retrieval
+  happening.
 - **all-MiniLM-L6-v2 is English-centric.** Fine for the FantaCo demo, weak on
   Slovak. Replaced with Qwen3-4B embeddings (dim 2560), which also matches the
   original PoC.
@@ -391,3 +573,43 @@ was plausible:
   than from several files that succeeded.
 - "Gemma 4 31B" was initially doubted as non-existent (knowledge cutoff).
   It exists; checking the registry settled it in one call.
+
+---
+
+## H. Possible improvements, not applied
+
+Deliberately left undone, recorded so the reasoning is not lost.
+
+### H1. Force retrieval in Agent-based mode
+
+The measurements in B3 make Agent-based mode unreliable *as a RAG path*: the model
+decides whether to retrieve, and it decides wrong precisely when the corpus
+disagrees with general knowledge. `tool_choice` can take that decision away from
+it, using the `knowledge_search` spelling from B6:
+
+```python
+request_kwargs["tool_choice"] = {
+    "type": "allowed_tools", "mode": "required",
+    "tools": [{"type": "function", "name": "knowledge_search"}],
+}
+```
+
+Not applied for two reasons. First, forcing a tool call on *every* turn breaks
+ordinary conversation — "thanks", "explain that again", or any follow-up would
+trigger a pointless vector search, and llama-stack resets `tool_choice` to `auto`
+only after the first iteration. Deciding when to force is a design question, not
+a patch. Second, `Direct` mode already retrieves unconditionally and is the
+supported path here, so the gap this would close is narrow.
+
+If it is wanted, the natural shape is an explicit UI control ("always search
+documents") rather than a hardcoded default, so the user can see the behaviour
+they are getting.
+
+### H2. Surface "no retrieval happened" in the UI
+
+The deeper problem behind B3 is not that the model skips retrieval, it is that
+skipping is *invisible*. The response already carries the evidence — an `outputs`
+list without `file_search_call` — so the UI could say plainly that an answer came
+from the model rather than the documents. That is a genuine improvement over
+forcing the tool, because it fixes the trust problem instead of hiding it, and it
+is a display change rather than a behavioural one.

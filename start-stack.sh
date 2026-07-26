@@ -24,6 +24,13 @@ export PATH="$HOME/.local/bin:$PATH"
 OLLAMA_URL_FOR_CONTAINERS="http://172.17.0.1:11434"   # podman bridge gateway
 NEMO_NETWORK="local_rag-network"
 
+# API keys live here, untracked (see SETUP.md). `set -a` exports every
+# assignment so podman-compose can interpolate them; compose treats an unset
+# key as empty, so a missing file only costs the features that need one.
+if [[ -f .env.local ]]; then
+    set -a; . ./.env.local; set +a
+fi
+
 log() { printf '%-7s %s\n' "$1" "$2"; }
 up()  { curl -sf --max-time 2 "$1" >/dev/null 2>&1; }
 

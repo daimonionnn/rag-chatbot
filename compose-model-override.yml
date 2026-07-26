@@ -13,11 +13,17 @@ services:
       # (`${env.EMBEDDING_MODEL:+trustyai_ragas_inline}`) and uses it as the
       # embedding model for the similarity-based metrics.
       EMBEDDING_MODEL: "ollama/qwen3-embedding:4b-fp16"
+      # Backs the builtin::websearch toolgroup (Agent-based mode). Interpolated
+      # from the shell, so the key itself lives in the untracked .env.local that
+      # start-stack.sh sources — never in a committed file. Empty is tolerated:
+      # the toolgroup then 401s, which only affects web search.
+      BRAVE_SEARCH_API_KEY: "${BRAVE_SEARCH_API_KEY:-}"
   rag-ui:
-    # Raises the "Max Tokens" sampling-parameter slider's ceiling (and fixes
-    # it actually being reachable — see patch-max-tokens-slider.py). Applied at
-    # container start, not baked into the image, so it survives an upstream
-    # image rebuild and never touches the RAG/ clone itself.
+    # Raises the "Max Tokens" sampling-parameter slider's ceiling (and fixes it
+    # actually being reachable), and stops every sidebar change from wiping the
+    # chat history — see patch-max-tokens-slider.py. Applied at container start,
+    # not baked into the image, so it survives an upstream image rebuild and
+    # never touches the RAG/ clone itself.
     # Absolute path: podman-compose resolves a relative source here against
     # the BASE compose file's directory (RAG/deploy/local), not this file's
     # own directory — a relative path silently mounted an auto-created empty

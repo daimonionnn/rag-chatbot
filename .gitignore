@@ -24,3 +24,6 @@ __pycache__/
 .client06-venv/
 .ls06-venv/
 .llamastack-venv/
+
+# Local secrets (API keys) — see SETUP.md
+.env.local

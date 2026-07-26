@@ -85,6 +85,16 @@ providers:
     config:
       api_key: ${env.TAVILY_SEARCH_API_KEY:=}
       max_results: 3
+  # Alternative web-search backend. Registered alongside Tavily because the
+  # `builtin::websearch` toolgroup below binds to exactly one provider, and both
+  # register their tool under the same name (`web_search`), so which one backs
+  # the toolgroup is a one-line switch and nothing above the provider layer
+  # notices. Keyless by default, like Tavily — see SETUP.md for supplying a key.
+  - provider_id: brave-search
+    provider_type: remote::brave-search
+    config:
+      api_key: ${env.BRAVE_SEARCH_API_KEY:=}
+      max_results: 3
   - provider_id: rag-runtime
     provider_type: inline::rag-runtime
   - provider_id: model-context-protocol
@@ -175,8 +185,12 @@ registered_resources:
   scoring_fns: []
   benchmarks: []
   tool_groups:
+  # Switched from upstream's `tavily-search` because the key we have is a Brave
+  # one. Without a usable key this toolgroup is not merely inert: the provider
+  # raises 401 and the agent answers from parametric memory instead (see BUGS.md
+  # B3), so the backing provider has to match whichever key is actually set.
   - toolgroup_id: builtin::websearch
-    provider_id: tavily-search
+    provider_id: brave-search
   - toolgroup_id: builtin::rag
     provider_id: rag-runtime
 server:

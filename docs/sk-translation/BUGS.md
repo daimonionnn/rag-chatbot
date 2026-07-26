@@ -139,6 +139,142 @@ angličtina skóruje `blocked` (lang=en, conf 0,911) a slovenčina `allowed`.
 bolo nahlásené, ale bez akejkoľvek informácie — a vierohodne vyzerajúce
 vysvetlenie (zlé PDF) bolo nesprávne.
 
+### B3. Agent-based mód odpovedá z parametrickej pamäte namiesto z dokumentov
+
+Najhorší failure mode nájdený v tomto projekte, pretože odpoveď vyzerá správne.
+V Agent-based móde sa modelu `file_search` a `web_search` len *ponúknu* a on ich
+nemusí zavolať — a potom odpovie z pamäte, bez akéhokoľvek signálu v UI, že sa
+nenačítal žiadny dokument. Na otázku `Kolko stoji zubna prehliadka?` s pripojeným
+storom `vszp` vygenerovala gemma4 sebavedomý, pekne formátovaný rozpis cien
+slovenskej stomatológie, ktorý celý pochádzal z modelu.
+
+Namerané po modeloch, rovnaká otázka, rovnaké nástroje (`outputs` z `/v1/responses`):
+
+| Model                  | `file_search`                                | `web_search`                          |
+|------------------------|----------------------------------------------|---------------------------------------|
+| `gemma3:27b-it-fp16`   | HTTP 500, `does not support tools`           | HTTP 500, `does not support tools`    |
+| `gemma4:31b-it-bf16`   | 200, `['message']` — **tool nikdy nezavolá** | 200, `['message']` — **nezavolá**     |
+| `qwen3.6:27b-mtp-bf16` | 200, `['file_search_call', 'message']`       | 200, `['web_search_call', 'message']` |
+
+Za jedným symptómom sú tri odlišné príčiny, takže „agent mód je rozbitý" je
+nesprávna diagnóza:
+
+1. **gemma3 tool calling vôbec nezvláda.** Ollama request odmietne priamo, čo sa
+   v UI prejaví ako `❌ Error: Error code: 500`. Keďže gemma3 je default
+   `INFERENCE_MODEL`, takto sa Agent-based mód chová hneď po zapnutí.
+2. **gemma4 nástroje prijme, ale nepoužije ich** — tichý prípad zhora.
+3. **Web search potrebuje kľúč zodpovedajúci nakonfigurovanému providerovi.** Bez
+   neho provider vyhodí `401 Unauthorized` z `api.tavily.com`; agent to spolkne
+   a aj tak odpovie z pamäte.
+
+**qwen3.6 tool zavolá, ale nie spoľahlivo — a rozhoduje o tom otázka.**
+Zopakovanie jednej identickej požiadavky nedáva jednu odpoveď. Namerané pri `n=3`
+na variantu, `file_search` ponúknutý vždy, temperature 0.1:
+
+| Otázka                                           | Tool zavolaný |
+|--------------------------------------------------|--------------:|
+| `Kolko stoji zubna prehliadka?`                  | 0/3           |
+| to isté, system prompt + `Answer in Slovak.`     | 1/3           |
+| `Ake vyhody ponuka Penazenka zdravia od VSZP …?` | 3/3           |
+
+Model teda načítava dokumenty vtedy, keď usúdi, že to *potrebuje*, a retrieval
+preskočí, keď otázka vyzerá ako všeobecná znalosť. To je samo o sebe obhájiteľné
+chovanie a presne nesprávne pre RAG asistenta: `Kolko stoji zubna prehliadka?`
+**má** špecifickú odpoveď vo VSZP korpuse a model namiesto nej vyprodukoval
+cenové rozsahy súkromných kliník z pamäte. Otázky, na ktoré najskôr odpovie bez
+retrievalu, sú práve tie, kde sa korpus rozchádza so všeobecnou znalosťou.
+
+**Oprava / ako to používať:** Agent-based mód *nie je* nedokončený template — je
+to Responses API z llama-stacku (`POST /v1/responses`, agents provider
+`inline::meta-reference`), tool-calling loop beží na strane servera a retrieval,
+ktorý vykoná, je reálny. Ale **`Direct` mód treba brať ako spoľahlivú cestu**:
+načítava *nepodmienene*, namiesto ponechania rozhodnutia na modeli, a preto ho
+používa aj evaluačný harness. Pre Agent-based mód vyberte
+`qwen3.6:27b-mtp-bf16` (jediný z tých troch, ktorý nástroje vôbec volá) a čítajte
+zoznam `outputs`, ktorý je jediným spoľahlivým dôkazom, že retrieval prebehol:
+chýbajúci `file_search_call` znamená, že dokumenty neboli konzultované, akokoľvek
+vierohodne text vyzerá.
+
+### B4. Web search sa potichu zdegraduje na žiadne vyhľadávanie
+
+Sčítavajú sa tu dve nezávislé tiché zlyhania. `builtin::websearch` sa viaže presne
+na jedného providera a upstream ho viaže na `tavily-search`. Brave kľúč
+v `BRAVE_SEARCH_API_KEY` teda nezmení nič — toolgroup ďalej volá Tavily, ďalej
+dostane `401` a agent ďalej odpovie z pamäte. Horšie, tool call sa v odpovedi
+nahlási ako `status="completed"`, takže UI zobrazí krok web search, ktorý nič
+nenašiel, a nikde to nepovie.
+
+**Oprava:** zaregistrovať zodpovedajúceho providera a nasmerovať naň toolgroup
+(`config-0.6.0.yaml`); obaja registrujú svoj tool pod tým istým názvom
+(`web_search`), takže nad úrovňou providera sa nemení nič. Overené živým dopytom,
+ktorý vrátil reálne slovenské výsledky. Samotný kľúč žije v netrackovanom
+`.env.local`, ktorý načítava `start-stack.sh` — pozri SETUP.md.
+
+### B5. Zmena web-search providera si vyžaduje najprv odregistrovanie
+
+Záznamy v registry sú **perzistentné** v metadata store
+(volume `local_llamastack_data`, `distributions/starter/kvstore.db`), nie
+odvodené z configu pri každom boote. Presmerovanie `builtin::websearch` na nového
+providera preto spôsobí, že server odmietne nabootovať:
+
+```
+ValueError: Object of type 'tool_group' and identifier 'builtin::websearch' already
+exists with conflicting field values: {'provider_id': ('brave-search', 'tavily-search')}
+```
+
+S `restart: on-failure:50` v compose súbore sa to prejaví ako crash-loopujúci
+kontajner, nie ako zrejmá chyba konfigurácie.
+
+**Oprava:** odregistrovať zastaraný záznam pred prepnutím —
+`DELETE /v1/toolgroups/builtin::websearch` (HTTP 204). Je to problém vajca
+a kuriatka, keďže server musí bežať, aby volanie prijal, a s novým configom sa
+nespustí: treba zdvihnúť **dočasný** kontajner so starým `provider_id`
+(bind-mount opraveného configu cez `/app/config.yaml`, rovnaký volume a network,
+iný port), odregistrovať v ňom, a potom spustiť ten skutočný, ktorý sa
+zaregistruje na nového providera. Ručná úprava `kvstore.db` tiež funguje, ale
+nestojí za to riziko.
+
+### B6. Vynútenie retrievalu cez `tool_choice` ho namiesto toho potichu vypne
+
+Skutočná chyba v llama-stacku a najzradnejší tvar, aký chyba môže mať: parameter,
+ktorého celým účelom je *zaručiť*, že nástroj pobeží, je práve to, čo mu v tom
+zabráni. Oba zrejmé zápisy sú prijaté, vrátia HTTP 200 a vyprodukujú sebavedomú
+odpoveď bez retrievalu a bez varovania:
+
+| `tool_choice` | Tool zavolaný |
+|-----|----:|
+| `{"type": "file_search"}` | 0/2 |
+| `{"type": "allowed_tools", "mode": "required", … "file_search"}` | 0/2 |
+| `{"type": "allowed_tools", "mode": "required", … "knowledge_search"}` | **2/2** |
+
+Príčinou je rozchod názvov vnútri `_process_tool_choice`
+(`providers/inline/agents/meta_reference/responses/streaming.py`). Pre voľbu
+`file_search` zloží záznam do allowed-tools ako
+
+```python
+case "file_search":
+    final_tools.append({"type": "function", "function": {"name": "file_search"}})
+```
+
+ale nástroj, ktorý sa modelu skutočne ponúka, sa menuje **`knowledge_search`** — to
+je názov, na ktorom executor dispatchuje, aj názov v
+`_SERVER_SIDE_BUILTIN_TOOL_NAMES`. Povolený zoznam sa potom aplikuje ako filter:
+
+```python
+effective_tools = [t for t in self.ctx.chat_tools
+                   if t.get("function", {}).get("name") in allowed_tool_names]
+```
+
+Na `"file_search"` sa nezhodne nič, takže `effective_tools` vyjde **prázdny** a
+model nedostane žiadne nástroje. Požiadať o to, aby bol retrieval povinný, je teda
+jediný spôsob, ako zaručiť, že sa nestane.
+
+**Workaround:** napísať nástroj ako `knowledge_search` v explicitnej voľbe
+`allowed_tools` — overené 2/2, pričom jeden run ho zavolal dvakrát. V tomto repo
+neopatchované: UI dnes `tool_choice` neposiela vôbec, takže na chybu tu nič
+nenarazí. Záleží na tom, ak by sa UI niekedy zmenilo tak, aby retrieval vynucovalo
+(pozri H).
+
 ---
 
 ## C. Nepripnuté / rozbehnuté závislosti
@@ -283,6 +419,42 @@ načítaný chunk), takže strop 32000 by sa **nikdy** nezmestil, ani pri Top K=
 a spôsobil by, že Ollama ticho zahodí načítané chunky. Aplikované pri štarte
 kontajnera skriptom `patch-max-tokens-slider.py`.
 
+### D11. Každá zmena v sidebare zmaže históriu chatu
+
+Zmena modelu, processing mode, ktoréhokoľvek sampling slidera alebo system promptu
+vymaže celú konverzáciu — takže porovnať dva modely na tej istej otázke, alebo
+zvýšiť Max Tokens po odseknutej odpovedi, sa nedá bez prepísania otázky nanovo.
+
+Osem widgetov v sidebare je napojených na callback, ktorý čistí session: sedem na
+`on_change=reset_agent` a MCP selektor na `on_reset`. `reset_agent()` je
+`st.session_state.clear()` nasledované `st.cache_resource.clear()`, a berie s sebou
+aj `messages` a `conversation_id`.
+
+Na tom resete nič nezávisí. `ChatConfig` sa skladá z widgetov nanovo pri *každom*
+reruny, takže zmenené nastavenie sa aj tak uplatní na najbližšej správe; a žiadna
+funkcia v `chat.py` nie je dekorovaná `@st.cache_resource`, takže cache polovica
+resetu nečistí nič. Upstream sám považuje plný reset za nepotrebný pri guardrail
+selektoroch, ktoré používajú užší `reset_conversation()`.
+
+**Oprava:** zrušiť tých osem callbackov (`patch-max-tokens-slider.py`).
+`Clear Chat & Reset Config` stále volá `reset_agent()`, takže začať odznova zostáva
+explicitná voľba. Dve pasce pri robení toho textovou substitúciou:
+
+- Sedem výskytov je na vlastnom riadku, ale ten pri System Prompt je inline medzi
+  ostatnými kwargs. Zmazanie `, on_change=reset_agent,` z
+  `value=default_prompt, on_change=reset_agent, height=100` spotrebuje **obe**
+  čiarky a nechá `value=default_prompt height=100` — `SyntaxError`, ktorý zastaví
+  import celej Chat stránky. Výskyty na vlastnom riadku sa berú s celým riadkom,
+  inline výskyty si nechávajú oddeľovaciu čiarku.
+- `on_reset` zostáva ako prijímaný, ale nepoužitý parameter
+  `render_toolgroup_selection`, namiesto odstránenia z jej signatúry *aj* z call
+  site. Tie dva edity musia doraziť spolu a polovične aplikovaný pár ju zavolá
+  s jedným argumentom viac, čím rozbije Agent-based mód.
+
+Patch výsledok pred zápisom prevedie cez `ast.parse` a inak odmietne zapisovať,
+potom overí, že neprežil žiadny callback — editovanie Pythonu regexom si oboje
+zaslúži.
+
 ---
 
 ## E. Pasce prostredia a prevádzky
@@ -399,3 +571,42 @@ nesprávne pritom vyzeralo vierohodne:
   súborov, ktoré prešli.
 - O „Gemma 4 31B" som spočiatku pochyboval, či vôbec existuje (knowledge cutoff).
   Existuje; jedno overenie v registry to vyriešilo.
+
+---
+
+## H. Možné zlepšenia, neaplikované
+
+Zámerne neurobené, zaznamenané aby sa nestratila argumentácia.
+
+### H1. Vynútiť retrieval v Agent-based móde
+
+Merania v B3 robia Agent-based mód nespoľahlivým *ako RAG cestu*: model sa
+rozhoduje, či načítať dokumenty, a rozhoduje sa nesprávne práve vtedy, keď sa
+korpus rozchádza so všeobecnou znalosťou. `tool_choice` mu to rozhodnutie môže
+odobrať, so zápisom `knowledge_search` z B6:
+
+```python
+request_kwargs["tool_choice"] = {
+    "type": "allowed_tools", "mode": "required",
+    "tools": [{"type": "function", "name": "knowledge_search"}],
+}
+```
+
+Neaplikované z dvoch dôvodov. Prvý: vynútenie tool callu na *každom* ťahu rozbije
+bežnú konverzáciu — „ďakujem", „vysvetli to ešte raz" alebo akákoľvek doplňujúca
+otázka by spustili zbytočné vektorové vyhľadávanie, a llama-stack resetuje
+`tool_choice` na `auto` až po prvej iterácii. Rozhodnutie, kedy vynucovať, je
+otázka dizajnu, nie patchu. Druhý: `Direct` mód už načítava nepodmienene a je tu
+podporovanou cestou, takže medzera, ktorú by to zaplnilo, je úzka.
+
+Ak sa to bude chcieť, prirodzeným tvarom je explicitný prvok v UI („vždy
+prehľadávať dokumenty") namiesto zadrôtovaného defaultu, aby užívateľ videl,
+aké chovanie dostáva.
+
+### H2. Zobraziť v UI, že retrieval neprebehol
+
+Hlbší problém za B3 nie je to, že model retrieval preskočí — je to, že preskočenie
+je *neviditeľné*. Odpoveď už dôkaz nesie: zoznam `outputs` bez `file_search_call`.
+UI by teda mohlo priamo povedať, že odpoveď prišla z modelu a nie z dokumentov. To
+je skutočné zlepšenie proti vynucovaniu nástroja, pretože rieši problém
+dôveryhodnosti namiesto jeho skrytia, a je to zmena zobrazenia, nie chovania.

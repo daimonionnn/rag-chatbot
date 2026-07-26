@@ -235,6 +235,23 @@ podman-compose down          # named volume and Ollama survive
 `rag-ingestion` container, and its Makefile prompts interactively for a Tavily
 key. Bringing up `llamastack rag-ui` explicitly is the equivalent here.
 
+### API keys
+
+Keys live in `.env.local` in the repo root — untracked (`.gitignore`), sourced by
+`start-stack.sh`, and interpolated into the compose files, so no key is ever in a
+committed file. Driving compose by hand needs it exported first:
+
+```bash
+set -a; . ./.env.local; set +a
+```
+
+Only web search needs one. `BRAVE_SEARCH_API_KEY` backs the `builtin::websearch`
+toolgroup used by Agent-based mode; everything else — chat, retrieval, guardrails,
+evaluation — runs without any key. Missing or empty is tolerated, but note that
+the resulting failure is silent (BUGS.md B4), and that the key has to match the
+provider the toolgroup is bound to: a Brave key does nothing while the toolgroup
+points at Tavily. Repointing it is a two-step operation, see BUGS.md B5.
+
 ### Restarting llamastack
 
 `podman rm -f rag-llamastack` fails while `rag-ui` exists — podman enforces the

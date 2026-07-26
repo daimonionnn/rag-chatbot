@@ -1,8 +1,8 @@
-<!-- translated-from: ddb460e -->
+<!-- translated-from: 60c9d87 -->
 # Chyby, pasce a opravy
 
 > **Slovenský preklad.** Zdroj: [`../../BUGS.md`](../../BUGS.md) v commite
-> `ddb460e`. Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on.
+> `60c9d87`. Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on.
 > Prehľad prekladov: [INDEX.md](INDEX.md).
 
 Všetko, čo bolo treba zdiagnostikovať, aby tento stack bežal, cez všetky tri fázy.

@@ -8,11 +8,11 @@ ak sa preklad a originál rozchádzajú, platí originál.
 | Dokument                                             | Preklad                        | Zdrojový commit |
 |------------------------------------------------------|--------------------------------|-----------------|
 | [`README.md`](../../README.md)                       | [README.md](README.md)         | `9e09e2a`       |
-| [`SETUP.md`](../../SETUP.md)                         | [SETUP.md](SETUP.md)           | `ddb460e`       |
+| [`SETUP.md`](../../SETUP.md)                         | [SETUP.md](SETUP.md)           | `60c9d87`       |
 | [`GUARDRAILS.md`](../../GUARDRAILS.md)               | [GUARDRAILS.md](GUARDRAILS.md) | `9e09e2a`       |
 | [`EVALUATION.md`](../../EVALUATION.md)               | [EVALUATION.md](EVALUATION.md) | `ddb460e`       |
 | [`EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) | [EVALUATION-LIMITS.md](EVALUATION-LIMITS.md) | `ddb460e` |
-| [`BUGS.md`](../../BUGS.md)                           | [BUGS.md](BUGS.md)             | `ddb460e` |
+| [`BUGS.md`](../../BUGS.md)                           | [BUGS.md](BUGS.md)             | `60c9d87` |
 
 ## Kontrola aktuálnosti
 

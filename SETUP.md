@@ -100,17 +100,24 @@ gets tight.
 Every LLM is exposed twice — directly and through the guardrails proxy — so the
 UI's model picker selects **model × rails-on/off** in one control:
 
-| Model in the UI                               | Tools / Agent mode | Thinking | VRAM (100 % GPU) |
-|-----------------------------------------------|--------------------|----------|------------------|
-| `ollama/gemma3:27b-it-fp16` · `nemo/…`        | ✗                  | ✗        | 55.0 GB          |
-| `ollama/gemma4:31b-it-bf16` · `nemo/…`        | ✓                  | ✓        | 63.7 GB          |
-| `ollama/qwen3.6:27b-mtp-bf16` · `nemo/…`      | ✓                  | ✓        | 53.6 GB          |
-| `ollama/llama3.2:3b-instruct-fp16` · `nemo/…` | ✓                  | ✗        | 6.4 GB           |
+| Model in the UI                               | Tools / Agent mode  | Thinking | VRAM (100 % GPU) |
+|-----------------------------------------------|---------------------|----------|------------------|
+| `ollama/gemma3:27b-it-fp16` · `nemo/…`        | ✗                   | ✗        | 55.0 GB          |
+| `ollama/gemma4:31b-it-bf16` · `nemo/…`        | accepts, never used | ✓        | 63.7 GB          |
+| `ollama/qwen3.6:27b-mtp-bf16` · `nemo/…`      | ✓ (intermittent)    | ✓        | 53.6 GB          |
+| `ollama/llama3.2:3b-instruct-fp16` · `nemo/…` | ✓                   | ✗        | 6.4 GB           |
 
 Gemma 3 cannot do tool calling (`ollama show` reports only `completion, vision`),
 so the UI's **Agent mode** and any `responses` call carrying a `file_search`
 tool fail against it with `500 … does not support tools`. Direct RAG is
-unaffected. Gemma 4 and Qwen3.6 do both.
+unaffected.
+
+The `✓` in that column means only that a request carrying tools is not rejected.
+Gemma 4 accepted the tools and never called them in any attempt, and Qwen3.6
+calls them only when it judges the question to need the documents — so
+Agent-based mode can answer from parametric memory with no sign that retrieval
+was skipped. Measured rates and the consequences are in BUGS.md B3; `Direct` mode
+retrieves unconditionally and is the dependable path.
 
 Only **one large model fits in VRAM at a time**, so switching in the UI costs a
 reload (~8 s warm, ~30 s cold). Ollama auto-registers whatever is pulled, so

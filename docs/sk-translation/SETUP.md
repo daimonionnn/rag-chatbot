@@ -1,8 +1,8 @@
-<!-- translated-from: ddb460e -->
+<!-- translated-from: 60c9d87 -->
 # 1 — Lokálne spustiteľný setup
 
 > **Slovenský preklad.** Zdroj: [`../../SETUP.md`](../../SETUP.md) v commite
-> `ddb460e`. Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on.
+> `60c9d87`. Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on.
 > Prehľad prekladov: [INDEX.md](INDEX.md).
 
 Ako sa chatbot z [`Sheryl-shiyi/RAG`](https://github.com/Sheryl-shiyi/RAG)
@@ -109,14 +109,21 @@ modelu v UI vyberá **model × rails zap/vyp** v jednom ovládacom prvku:
 | Model v UI                                    | Tools / Agent mode | Thinking | VRAM (100 % GPU) |
 |-----------------------------------------------|--------------------|----------|------------------|
 | `ollama/gemma3:27b-it-fp16` · `nemo/…`        | ✗                  | ✗        | 55.0 GB          |
-| `ollama/gemma4:31b-it-bf16` · `nemo/…`        | ✓                  | ✓        | 63.7 GB          |
-| `ollama/qwen3.6:27b-mtp-bf16` · `nemo/…`      | ✓                  | ✓        | 53.6 GB          |
+| `ollama/gemma4:31b-it-bf16` · `nemo/…`        | prijme, nepoužije  | ✓        | 63.7 GB          |
+| `ollama/qwen3.6:27b-mtp-bf16` · `nemo/…`      | ✓ (nepravidelne)   | ✓        | 53.6 GB          |
 | `ollama/llama3.2:3b-instruct-fp16` · `nemo/…` | ✓                  | ✗        | 6.4 GB           |
 
 Gemma 3 nezvláda tool calling (`ollama show` hlási len `completion, vision`),
 takže **Agent mode** v UI a každé volanie `responses` nesúce nástroj
 `file_search` na nej zlyhá s `500 … does not support tools`. Priamy RAG to
-neovplyvňuje. Gemma 4 aj Qwen3.6 zvládajú oboje.
+neovplyvňuje.
+
+`✓` v tom stĺpci znamená len to, že požiadavka nesúca nástroje nebude odmietnutá.
+Gemma 4 nástroje prijala a v žiadnom pokuse ich nezavolala, a Qwen3.6 ich volá len
+vtedy, keď usúdi, že otázka dokumenty potrebuje — takže Agent-based mód môže
+odpovedať z parametrickej pamäte bez akéhokoľvek signálu, že sa retrieval
+preskočil. Namerané miery a dôsledky sú v BUGS.md B3; `Direct` mód načítava
+nepodmienene a je spoľahlivou cestou.
 
 Do VRAM sa naraz zmestí **len jeden veľký model**, takže prepnutie v UI stojí
 reload (~8 s teplý, ~30 s studený). Ollama si automaticky zaregistruje čokoľvek,
@@ -246,6 +253,25 @@ podman-compose down          # named volume a Ollama prežijú
 `make start` obchádzame: spúšťa aj nekompatibilný 0.2.x kontajner
 `rag-ingestion` a jeho Makefile sa interaktívne pýta na Tavily kľúč. Explicitné
 zdvihnutie `llamastack rag-ui` je tu ekvivalent.
+
+### API kľúče
+
+Kľúče žijú v `.env.local` v koreni repozitára — netrackované (`.gitignore`),
+načítavané `start-stack.sh` a interpolované do compose súborov, takže žiadny kľúč
+nikdy nie je v commitnutom súbore. Pri ručnom riadení compose ho treba najprv
+exportovať:
+
+```bash
+set -a; . ./.env.local; set +a
+```
+
+Kľúč potrebuje jedine web search. `BRAVE_SEARCH_API_KEY` stojí za toolgroupou
+`builtin::websearch`, ktorú používa Agent-based mód; všetko ostatné — chat,
+retrieval, guardrails, evaluácia — beží bez akéhokoľvek kľúča. Chýbajúci alebo
+prázdny je tolerovaný, ale pozor, že výsledné zlyhanie je tiché (BUGS.md B4) a že
+kľúč musí zodpovedať providerovi, na ktorý je toolgroup napojená: Brave kľúč
+nerobí nič, kým toolgroup smeruje na Tavily. Prepnutie je dvojkrokové, pozri
+BUGS.md B5.
 
 ### Reštart llamastacku
 

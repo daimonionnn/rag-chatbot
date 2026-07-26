@@ -130,7 +130,8 @@ LLM without thrashing.
 
 ## 3.5 Smoke-test result
 
-Two rows, gemma3 generating and judging, to prove the pipeline end to end:
+Two rows, gemma3 generating and judging, to prove the pipeline end to end before
+committing to the ~16 h full run:
 
 | Metric | Aggregate |
 |--------|-----------|
@@ -141,12 +142,7 @@ Two rows, gemma3 generating and judging, to prove the pipeline end to end:
 | answer_relevancy | 0.673 |
 | factual_correctness | 0.665 |
 
-Two rows prove nothing about quality — they prove the wiring. The high
-context scores are consistent with the near-exact retrieval noted above; the
-lower `answer_relevancy` is expected to move most once a real sample is run.
-
-**A full benchmark has not been run yet** — the scope decision (which models, how
-many questions) is open.
+Two rows prove nothing about quality — they prove the wiring.
 
 ---
 
@@ -165,3 +161,64 @@ measured on this stack:
   fluency-and-topic check, not a correctness check.
 - **No metric measures Slovak language quality**, so a fluent-Czech or
   broken-Slovak answer would pass unflagged.
+
+---
+
+## 3.7 Full-benchmark results
+
+All 182 questions, all three models, judge `ollama/gemma3:27b-it-fp16` throughout
+(so the "judge is one of the contestants" caveat in
+[EVALUATION-LIMITS.md §4.5](EVALUATION-LIMITS.md) applies to every gemma3 column).
+Ran 2026-07-25 21:56 → 2026-07-26 16:57, elapsed 1141 min (~19 h — longer than the
+~16 h estimate; see the timing table below for why). Zero job failures; NaN rows
+(from a judge reply ragas could not parse, see [BUGS.md](BUGS.md) A2) were scored
+as missing and excluded from the means below rather than zeroing the average.
+
+| Metric | gemma3 | gemma4 | qwen3.6 | Separates models? |
+|--------|-------:|-------:|--------:|:------------------:|
+| context_recall | 0.9960 | 0.9960 | 0.9932 | no — retrieval-only, see §4.1 |
+| context_precision | 0.9882 | 0.9844 | 0.9851 | no — retrieval-only, see §4.1 |
+| faithfulness | 0.9820 | **0.9872** | 0.9713 | yes |
+| answer_relevancy | 0.6030 | 0.6507 | **0.6634** | yes |
+| answer_similarity | **0.9628** | 0.9242 | 0.8914 | yes |
+| factual_correctness | **0.8885** | 0.8438 | 0.8008 | yes |
+
+`context_recall` came out **bit-identical** between gemma3 and gemma4 (0.9960 =
+0.9960), confirming §4.1's prediction directly: with retrieval held constant, that
+metric cannot distinguish models.
+
+### Generation and data quality
+
+| | gemma3 | gemma4 | qwen3.6 |
+|---|------:|------:|------:|
+| generation time (182 q) | 17 min | 76 min | 41 min |
+| answer length, median chars | 248 | 268 | 355 |
+| answer length, max chars | 820 | 1977 | 1919 |
+| `<think>`/`<reasoning>` tags leaked into the answer | 0 | 0 | 0 |
+| faithfulness NaN rows | 2 | 3 | 2 |
+| factual_correctness NaN rows | 1 | 5 | 0 |
+
+gemma4 and qwen3.6 both advertise a `thinking` capability; gemma3 does not.
+Despite that, **no reasoning text leaked into any answer** for any model — the
+`strip_reasoning()` safeguard in `run_rag.py` never had to trigger (its log line
+never printed). gemma4's 4.5× longer generation time with barely longer output is
+consistent with Ollama returning reasoning tokens out-of-band rather than in
+`content`, so the extra time is a latency cost, not a contamination risk.
+
+### Reading the four real metrics together
+
+- **gemma3** leads on `answer_similarity` and `factual_correctness` — closest to
+  the reference text.
+- **qwen3.6** leads on `answer_relevancy`, gemma4 close behind; both ahead of
+  gemma3.
+- **gemma4** leads on `faithfulness`.
+- Answer length increases monotonically with the gap from the reference
+  (gemma3 248 chars → gemma4 268 → qwen3.6 355), which is the expected shape if
+  longer, more elaborated answers diverge lexically from a terse FAQ-style
+  reference while still being well-grounded and on-topic.
+
+None of these gaps should be read as a ranking without the caveats in
+[EVALUATION-LIMITS.md §4.10](EVALUATION-LIMITS.md) — in particular, a concrete,
+measured dataset defect (duplicate questions with mismatched references) was
+found to depress `factual_correctness` for all three models, and no repeat runs
+exist to establish whether gaps this size exceed the judge's own noise.

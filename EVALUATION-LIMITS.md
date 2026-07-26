@@ -8,9 +8,11 @@ Two labels are used throughout, and the distinction matters:
 - **MEASURED** — verified on this stack, with the figures shown.
 - **REASONED** — an argument from how the metrics are built, not yet tested.
 
-Written while the first full benchmark was still running, so the specific scores
-are not in yet. **Revisit once all three models are done** — §4.9 lists what to
-re-check against real data.
+Sections 4.1–4.8 were written while the first full benchmark was still running,
+against a 2-row smoke test. §4.9 was the list of what to re-check once real data
+existed. §4.10, added afterward, is that re-check — the results are in and one of
+them (duplicate questions with mismatched references) turned out to be the
+single most concrete finding in this document.
 
 ---
 
@@ -208,16 +210,27 @@ rows rather than 182.
 
 ## 4.8 Improvement backlog, in priority order
 
-1. **Output language ID** on every answer (§4.4). Cheapest, closes the largest
-   blind spot for a Slovak product.
-2. **Exact-match check for numbers, dates and negations** (§4.3). Turns the
+Re-ordered after §4.10 landed a measured result: fixing the dataset now outranks
+everything, since it demonstrably moves the numbers more than any model
+difference found.
+
+0. **Fix the 23 duplicate/narrow-reference questions** (§4.10.2). Measured to
+   depress `factual_correctness` by more than any model-to-model gap in the
+   benchmark, for all three models. Nothing else on this list is worth doing
+   before this.
+1. **Noise floor** from repeat runs (§4.6, §4.10.1). Without it, none of the
+   3–5 point model gaps found are defensible as real.
+2. **Output language ID** on every answer (§4.4). Cheapest remaining item,
+   closes the largest blind spot for a Slovak product.
+3. **Exact-match check for numbers, dates and negations** (§4.3). Turns the
    metric suite's weakest point into a hard signal.
-3. **Report retrieval metrics once**, not per model (§4.1). Removes a misleading
-   column.
-4. **Noise floor** from repeat runs (§4.6). Without it no ranking is defensible.
-5. **Add latency + VRAM** to the results table (§4.7). Makes the comparison a
-   production decision rather than a leaderboard.
-6. **Cross-judge on a 40-question subset** (§4.5). Quantifies the judge bias.
+4. **Add latency + VRAM** to the results table (§4.7, §4.10.3). gemma4 cost
+   4.5× gemma3's generation time for a few points of `faithfulness` — a real
+   production trade-off the current table hides entirely.
+5. **Report retrieval metrics once**, not per model (§4.1). Removes a
+   misleading column — confirmed bit-identical between two of the three models.
+6. **Cross-judge on a 40-question subset** (§4.5). gemma3 leads on two of four
+   real metrics by exactly the margin self-judging bias could produce.
 7. **Extend the test set**: paraphrases, multi-document questions, unanswerable
    questions (§4.2). The biggest change, and the one that would make the
    benchmark measure reasoning rather than copying.
@@ -226,20 +239,108 @@ rows rather than 182.
 
 ---
 
-## 4.9 Revisit when the benchmark finishes
+## 4.9 What was checked, and the answer
 
-Specific things to check against the real scores:
+- **Do `context_precision` / `context_recall` really come out equal?** Yes.
+  `context_recall` was **bit-identical** between gemma3 and gemma4 (0.9960 =
+  0.9960); qwen3.6 differed only at the fourth decimal (0.9932). §4.1 confirmed.
+- **Are the differences smaller than a few points?** Yes, on the four metrics
+  that matter: at most a 5-point gap (`factual_correctness`, gemma3 vs qwen3.6).
+  Consistent with §4.2's "retrieval-and-copy task" reading — see §4.10.1 for why
+  even that gap is not fully trustworthy.
+- **Does `answer_similarity` disagree with `factual_correctness`?** Frequently,
+  and by a lot — up to a 0.95-point gap on individual rows. See §4.10.2: the
+  worked example is not a metric quirk but a **dataset defect**.
+- **Did the thinking models leak reasoning into the answer?** No. `run_rag.py`'s
+  `NOTE: stripped inline reasoning` line never printed for any of the 546
+  generations (182 × 3 models). See §4.10.3 for what their extra generation time
+  means instead.
+- **Does gemma3 win narrowly?** Yes, on two of four real metrics, by 3–5 points —
+  small enough that §4.5's self-judging concern is live, not a footnote. It was
+  not tested further here (would need cross-judging, §4.5's proposed fix).
 
-- Do `context_precision` / `context_recall` really come out equal across the
-  three models? If not, the retrieval is less deterministic than assumed
-  (§4.1).
-- Are the differences between models smaller than a few points, as §4.2 predicts?
-  If a model wins by a wide margin, the "copy task" reading is incomplete.
-- Does `answer_similarity` disagree with `factual_correctness` on any row? Those
-  rows are where §4.3 bites, and they are worth reading by hand.
-- Did the thinking models emit reasoning inline? `run_rag.py` logs
-  `NOTE: stripped inline reasoning from N/182 answers`. If N is large for gemma4
-  or qwen3.6, their earlier numbers would have been depressed for a reason that
-  has nothing to do with answer quality.
-- Does gemma3 win narrowly? Then §4.5 (self-judging) becomes the first thing to
-  test, not a footnote.
+Full numbers: [EVALUATION.md §3.7](EVALUATION.md).
+
+---
+
+## 4.10 Confirmed against the real benchmark
+
+### 4.10.1 No noise floor exists, and the gaps are within where one might matter
+
+§4.6's concern stands unresolved: with one run per model, there is no measured
+distribution to compare a 3–5 point gap against. The gaps found
+(`factual_correctness`: gemma3 0.889 vs qwen3.6 0.801; `answer_similarity`:
+0.963 vs 0.891) are exactly the size where it matters whether they are signal or
+judge noise, and this run cannot tell the two apart. Treat the ranking in
+§EVALUATION.md 3.7 as suggestive, not decisive, until repeat runs exist.
+
+### 4.10.2 A dataset defect, not a metric quirk: duplicate questions, mismatched references
+
+The single most concrete finding from the full run. Of the 182 questions,
+**23 (46 rows, 25 % of the dataset) are exact-text duplicates** — the same
+question appears twice, once scoped to *Peňaženka zdravia MINI* and once to
+*MAXI*, each with a reference answer that only states the rule for its own
+product:
+
+```
+idx 39  (MINI):  reference = "…z Peňaženky zdravia MINI je možné zaslať iba na účty registrované na Slovensku."
+idx 123 (MAXI):  reference = "…z Peňaženky zdravia MAXI je možné zaslať iba na účty registrované na Slovensku."
+```
+
+Both gemma3 and qwen3.6 answered **both** occurrences identically and completely:
+*"Finančné príspevky z Peňaženky zdravia MINI a MAXI je možné zaslať iba na účty
+registrované na Slovensku."* This is not a hallucination — the retrieved context
+literally contains the MAXI-specific FAQ entry confirming the same rule, so the
+answer is fully grounded. `faithfulness` scored it **1.0 in all four
+combinations** (2 models × 2 indices), correctly recognising the grounding.
+
+`factual_correctness` scored the *same answer text* **1.0 at idx 39 and 0.0 at
+idx 123**, for both models. Its claim-matching is bidirectional against the
+*reference*, not the corpus: at idx 123 the answer's "MINI" claim cannot be
+verified against a reference that only ever mentions MAXI, so it is treated as
+unsupported, and the correct, grounded answer scores zero.
+
+This is not an isolated case. Averaged over all three models, `factual_correctness`
+on the 46 duplicate-question rows is measurably lower than on the 136 unique ones:
+
+| Model | duplicate-question rows | unique-question rows | gap |
+|-------|------------------------:|----------------------:|-----:|
+| gemma3 | 0.831 | 0.908 | −0.077 |
+| gemma4 | 0.818 | 0.853 | −0.035 |
+| qwen3.6 | 0.781 | 0.807 | −0.026 |
+
+Every model loses more on the flawed 25 % of the dataset than the actual
+model-to-model gaps in §EVALUATION.md 3.7 (3–5 points). **The single biggest lever
+on these numbers is not the model, the judge, or the metric — it is fixing (or
+removing) the 23 duplicate/narrow-reference questions**, something no amount of
+prompt or model tuning can work around.
+
+**Fix:** either merge each MINI/MAXI pair into one reference that states the rule
+generically (it is, after all, the same rule), or drop the narrower half of each
+duplicate. Re-run after fixing this before drawing any conclusion from
+`factual_correctness`.
+
+### 4.10.3 The thinking models' extra time is latency, not contamination
+
+gemma4 took 76 min to generate 182 answers against gemma3's 17 min (4.5×) and
+qwen3.6's 41 min, while producing similarly-sized answers (median 268 vs 248
+chars) — not proportionally longer output. Combined with zero `<think>` tags
+found in any answer, the extra time is consistent with Ollama executing (and
+billing for) reasoning tokens that never reach the `content` field, rather than
+visible reasoning contaminating the scored text. Good news for the fairness of
+the comparison; bad news for anyone budgeting latency — §4.7's proposed
+latency/VRAM column in the results table would have caught this immediately and
+is still not there.
+
+### 4.10.4 Answer length tracks distance from the reference
+
+Median answer length rises monotonically with the metrics that measure closeness
+to the reference: gemma3 (248 chars) scores highest on `answer_similarity` /
+`factual_correctness`; qwen3.6 (355 chars) scores highest on `answer_relevancy`
+and lowest on the reference-matching metrics. Consistent with §4.2 and §4.3:
+longer, more elaborated (and plausibly more genuinely helpful) answers diverge
+lexically from a terse FAQ-style reference even when equally well-grounded. This
+is the same mechanism as §4.10.2, operating continuously rather than as a binary
+dataset defect — another reason `answer_similarity` and `factual_correctness`
+should not be read as the final word on quality without the fluency/relevancy
+metrics alongside them.

@@ -91,7 +91,11 @@ def main() -> None:
             "eval_candidate": {
                 "type": "model",
                 "model": judge,
-                "sampling_params": {"temperature": 0.0, "max_tokens": 1024},
+                # max_tokens must be generous: ragas asks the judge for JSON
+                # (faithfulness sends one object per extracted statement), and at
+                # 1024 the reply was truncated mid-string, so ragas' parser
+                # failed and took the whole job down.
+                "sampling_params": {"temperature": 0.0, "max_tokens": 4096},
             },
             "scoring_params": {},
         },
@@ -99,14 +103,16 @@ def main() -> None:
     print(f"job: {job}")
 
     # run_eval may be async (returns a job); poll until it finishes.
+    final_state = "completed"
     job_id = getattr(job, "job_id", None)
     if job_id:
         while True:
             st = client.alpha.eval.jobs.status(
                 benchmark_id=benchmark_id, job_id=job_id)
-            state = getattr(st, "status", st)
+            state = str(getattr(st, "status", st)).lower()
             print(f"  [{time.time()-started:6.0f}s] {state}")
-            if str(state).lower() in ("completed", "failed", "cancelled"):
+            if state in ("completed", "failed", "cancelled"):
+                final_state = state
                 break
             time.sleep(15)
         result = client.alpha.eval.jobs.retrieve(
@@ -117,10 +123,23 @@ def main() -> None:
     out_dir = Path(__file__).parent / "results"
     out_dir.mkdir(exist_ok=True)
     out = out_dir / f"scores__{slug}__{stamp}.json"
-    out.write_text(json.dumps(
-        result.to_dict() if hasattr(result, "to_dict") else str(result),
-        ensure_ascii=False, indent=2))
+    payload = result.to_dict() if hasattr(result, "to_dict") else str(result)
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
     print(f"\nwrote {out}  ({(time.time()-started)/60:.1f} min)")
+
+    # Report the truth: a failed job still returns a well-formed but EMPTY
+    # payload, so without this check the caller happily logs success and a whole
+    # multi-model benchmark can "finish" with no scores at all.
+    scored = payload.get("scores") if isinstance(payload, dict) else None
+    if final_state != "completed" or not scored:
+        print(f"FAILED: job state={final_state}, metrics returned="
+              f"{len(scored or {})} — see the llamastack log for the cause")
+        sys.exit(1)
+    print(f"OK: {len(scored)} metrics")
+    for name, res in scored.items():
+        agg = res.get("aggregated_results", {}) if isinstance(res, dict) else {}
+        val = next(iter(agg.values()), None) if agg else None
+        print(f"  {name:22} {val}")
 
 
 if __name__ == "__main__":

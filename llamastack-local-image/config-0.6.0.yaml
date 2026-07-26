@@ -98,6 +98,12 @@ providers:
     module: llama_stack_provider_ragas.inline
     config:
       embedding_model: ${env.EMBEDDING_MODEL}
+      ragas_config:
+        # Default is true, which makes ONE unparseable judge reply abort the
+        # whole evaluation: a 182-row job died after 54 minutes because the
+        # judge emitted truncated JSON on a single row. With this off, that row
+        # scores NaN and the run continues.
+        raise_exceptions: false
       kvstore:
         namespace: ragas
         backend: kv_default

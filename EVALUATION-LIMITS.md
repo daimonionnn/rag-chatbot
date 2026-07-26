@@ -20,14 +20,14 @@ single most concrete finding in this document.
 
 **MEASURED.** The inputs each metric actually consumes:
 
-| Metric | Uses `response`? | Inputs |
-|--------|------------------|--------|
-| `faithfulness` | yes | response, retrieved_contexts, user_input |
-| `answer_relevancy` | yes | response, user_input |
-| `answer_similarity` | yes | reference, response |
-| `factual_correctness` | yes | reference, response |
-| `context_precision` | **no** | reference, retrieved_contexts, user_input |
-| `context_recall` | **no** | reference, retrieved_contexts, user_input |
+| Metric                | Uses `response`? | Inputs                                    |
+|-----------------------|------------------|-------------------------------------------|
+| `faithfulness`        | yes              | response, retrieved_contexts, user_input  |
+| `answer_relevancy`    | yes              | response, user_input                      |
+| `answer_similarity`   | yes              | reference, response                       |
+| `factual_correctness` | yes              | reference, response                       |
+| `context_precision`   | **no**           | reference, retrieved_contexts, user_input |
+| `context_recall`      | **no**           | reference, retrieved_contexts, user_input |
 
 `context_precision` and `context_recall` never see the answer. Retrieval is
 identical for every model here — same vector store, same embedding, same
@@ -76,16 +76,16 @@ documents, (c) questions answerable only from *other* documents in the corpus
 the answer and the reference. Perturbing a real reference answer and scoring each
 variant against the original:
 
-| Variant of the reference answer | Score | Penalty |
-|---------------------------------|-------|---------|
-| identical | 1.0000 | — |
-| small grammar errors (wrong case endings) | 0.9985 | 0.0015 |
-| **`30 eur` → `300 eur`** (10× wrong amount) | **0.9899** | 0.010 |
-| **negated** (`Nie je spoplatnená` → `Je spoplatnená`) | **0.9943** | 0.006 |
-| **negated** (`môžete` → `nemôžete`) | 0.9636 | 0.036 |
-| `raz za rok` → `raz za mesiac` | 0.9547 | 0.045 |
-| grossly wrong content (wrong place entirely) | 0.7856 | 0.214 |
-| **correct answer, but written in English** | **0.8293** | 0.171 |
+| Variant of the reference answer                       | Score      | Penalty |
+|-------------------------------------------------------|------------|---------|
+| identical                                             | 1.0000     | —       |
+| small grammar errors (wrong case endings)             | 0.9985     | 0.0015  |
+| **`30 eur` → `300 eur`** (10× wrong amount)           | **0.9899** | 0.010   |
+| **negated** (`Nie je spoplatnená` → `Je spoplatnená`) | **0.9943** | 0.006   |
+| **negated** (`môžete` → `nemôžete`)                   | 0.9636     | 0.036   |
+| `raz za rok` → `raz za mesiac`                        | 0.9547     | 0.045   |
+| grossly wrong content (wrong place entirely)          | 0.7856     | 0.214   |
+| **correct answer, but written in English**            | **0.8293** | 0.171   |
 
 Read the two bold rows together:
 
@@ -127,12 +127,12 @@ reality is not reassuring either.** From the table in §4.3: grammar errors cost
 **0.0015**, a negated fact costs **0.006–0.036**. So the lie is penalised more —
 but both are inside the noise. The real distortion is elsewhere:
 
-| Kind of defect | Penalty on `answer_similarity` |
-|----------------|-------------------------------|
-| broken grammar, correct content | 0.0015 |
-| perfect grammar, negated fact | 0.006 |
-| perfect grammar, 10× wrong amount | 0.010 |
-| **correct content, wrong language** | **0.171** |
+| Kind of defect                      | Penalty on `answer_similarity` |
+|-------------------------------------|--------------------------------|
+| broken grammar, correct content     | 0.0015                         |
+| perfect grammar, negated fact       | 0.006                          |
+| perfect grammar, 10× wrong amount   | 0.010                          |
+| **correct content, wrong language** | **0.171**                      |
 
 The metric reacts ~17× more strongly to *which language you answered in* than to
 *whether the answer was true*. And it does that for the wrong reason: not because
@@ -198,12 +198,12 @@ rows rather than 182.
 
 ## 4.7 Things not measured at all
 
-| Gap | Why it matters |
-|-----|----------------|
-| **The guardrailed path** | Only `ollama/*` is evaluated. The `nemo/*` path — the one with the safety rails, and closest to production — is never scored, so the quality and latency cost of the rails is unknown. |
-| **Latency, VRAM, throughput** | A 64 GB model that is meaningfully slower for +1 point is a bad production trade, but nothing in the suite sees it. Generation speed and VRAM are known per model (see [SETUP.md](SETUP.md)) and belong in the same table as the scores. |
-| **Correct abstention** | When retrieval misses, saying "this is not in the documents" is the right behaviour — one gemma3 answer did exactly that. Against a reference containing real content, `factual_correctness` scores it 0, identically to a confident fabrication. Honest abstention and hallucination are indistinguishable in these numbers. |
-| **Retrieval configuration** | `top_k=5`, chunk 512/overlap 64 are fixed at the PoC's values and never varied, so it is unknown whether retrieval is the bottleneck. |
+| Gap                            | Why it matters |
+|--------------------------------|-----|
+| **The guardrailed path**       | Only `ollama/*` is evaluated. The `nemo/*` path — the one with the safety rails, and closest to production — is never scored, so the quality and latency cost of the rails is unknown. |
+| **Latency, VRAM, throughput**  | A 64 GB model that is meaningfully slower for +1 point is a bad production trade, but nothing in the suite sees it. Generation speed and VRAM are known per model (see [SETUP.md](SETUP.md)) and belong in the same table as the scores. |
+| **Correct abstention**         | When retrieval misses, saying "this is not in the documents" is the right behaviour — one gemma3 answer did exactly that. Against a reference containing real content, `factual_correctness` scores it 0, identically to a confident fabrication. Honest abstention and hallucination are indistinguishable in these numbers. |
+| **Retrieval configuration**    | `top_k=5`, chunk 512/overlap 64 are fixed at the PoC's values and never varied, so it is unknown whether retrieval is the bottleneck. |
 | **`factual_correctness` mode** | Runs at the default `mode=f1`, which balances precision and recall. For this domain, precision (not inventing entitlements) probably matters more than recall, and the mode is worth choosing deliberately. |
 
 ---
@@ -303,11 +303,11 @@ unsupported, and the correct, grounded answer scores zero.
 This is not an isolated case. Averaged over all three models, `factual_correctness`
 on the 46 duplicate-question rows is measurably lower than on the 136 unique ones:
 
-| Model | duplicate-question rows | unique-question rows | gap |
-|-------|------------------------:|----------------------:|-----:|
-| gemma3 | 0.831 | 0.908 | −0.077 |
-| gemma4 | 0.818 | 0.853 | −0.035 |
-| qwen3.6 | 0.781 | 0.807 | −0.026 |
+| Model   | duplicate-question rows | unique-question rows | gap    |
+|---------|------------------------:|---------------------:|-------:|
+| gemma3  | 0.831                   | 0.908                | −0.077 |
+| gemma4  | 0.818                   | 0.853                | −0.035 |
+| qwen3.6 | 0.781                   | 0.807                | −0.026 |
 
 Every model loses more on the flawed 25 % of the dataset than the actual
 model-to-model gaps in §EVALUATION.md 3.7 (3–5 points). **The single biggest lever

@@ -6,7 +6,7 @@ reproduced from three upstream repositories on a single workstation with
 cluster.
 
 | Upstream | What we take from it |
-|----------|----------------------|
+|-----|-----|
 | [`Sheryl-shiyi/RAG`](https://github.com/Sheryl-shiyi/RAG) (fork of Red Hat `rh-ai-quickstart/RAG`) | the chatbot: Llama Stack + Streamlit UI + ingestion |
 | [`Sheryl-shiyi/Nemo-guardrial-deployment`](https://github.com/Sheryl-shiyi/Nemo-guardrial-deployment) | the input/output safety rails |
 | [`Sheryl-shiyi/proj-poc-RAGAS`](https://github.com/Sheryl-shiyi/proj-poc-RAGAS) + [`llama-stack-provider-ragas`](https://github.com/Sheryl-shiyi/llama-stack-provider-ragas) | the evaluation methodology and engine |
@@ -33,13 +33,13 @@ un-shallows and moves them if a pin is ever updated.
 
 ## Documentation
 
-| | Document | Contents |
-|---|----------|----------|
-| 1 | **[SETUP.md](SETUP.md)** | Local runnable setup: prerequisites, the Llama Stack image we build, models, ingestion, day-to-day operation |
-| 2 | **[GUARDRAILS.md](GUARDRAILS.md)** | NeMo Guardrails as a transparent proxy, the rails, and how the UI exposes rails-on/off |
-| 3 | **[EVALUATION.md](EVALUATION.md)** | RAGAS evaluation through the TrustyAI llama-stack provider, metrics, and the harness |
-| 4 | **[EVALUATION-LIMITS.md](EVALUATION-LIMITS.md)** | What the evaluation does *not* measure — measured blind spots (facts vs. fluency, Slovak untested) and a prioritised improvement backlog |
-| — | **[BUGS.md](BUGS.md)** | Every defect and trap hit across the project, with the fix |
+|     | Document                                         | Contents |
+|-----|--------------------------------------------------|-----|
+| 1   | **[SETUP.md](SETUP.md)**                         | Local runnable setup: prerequisites, the Llama Stack image we build, models, ingestion, day-to-day operation |
+| 2   | **[GUARDRAILS.md](GUARDRAILS.md)**               | NeMo Guardrails as a transparent proxy, the rails, and how the UI exposes rails-on/off |
+| 3   | **[EVALUATION.md](EVALUATION.md)**               | RAGAS evaluation through the TrustyAI llama-stack provider, metrics, and the harness |
+| 4   | **[EVALUATION-LIMITS.md](EVALUATION-LIMITS.md)** | What the evaluation does *not* measure — measured blind spots (facts vs. fluency, Slovak untested) and a prioritised improvement backlog |
+| —   | **[BUGS.md](BUGS.md)**                           | Every defect and trap hit across the project, with the fix |
 
 ---
 

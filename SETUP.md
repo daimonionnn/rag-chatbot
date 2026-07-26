@@ -16,11 +16,11 @@ chatbot that actually works.
 
 Its three parts target three incompatible Llama Stack versions:
 
-| Component | Pinned version | API it speaks |
-|-----------|----------------|---------------|
-| `frontend/` (the UI) | **0.6.0** | OpenAI-style `vector_stores`, `responses`, `conversations`, `chat.completions` |
-| `deploy/local` compose image | 0.2.9 | legacy `vector_dbs`, `inference.chat_completion` |
-| `ingestion-service/` | 0.2.22 | legacy `vector_dbs`, `rag-tool/insert` |
+| Component                    | Pinned version | API it speaks |
+|------------------------------|----------------|-----|
+| `frontend/` (the UI)         | **0.6.0**      | OpenAI-style `vector_stores`, `responses`, `conversations`, `chat.completions` |
+| `deploy/local` compose image | 0.2.9          | legacy `vector_dbs`, `inference.chat_completion` |
+| `ingestion-service/`         | 0.2.22         | legacy `vector_dbs`, `rag-tool/insert` |
 
 A real 0.2.9 server answers the UI with **HTTP 426 ("update your client")**, and
 with the version check disabled its calls simply **404** — those OpenAI-style
@@ -100,12 +100,12 @@ gets tight.
 Every LLM is exposed twice — directly and through the guardrails proxy — so the
 UI's model picker selects **model × rails-on/off** in one control:
 
-| Model in the UI | Tools / Agent mode | Thinking | VRAM (100 % GPU) |
-|-----------------|--------------------|----------|------------------|
-| `ollama/gemma3:27b-it-fp16` · `nemo/…` | ✗ | ✗ | 55.0 GB |
-| `ollama/gemma4:31b-it-bf16` · `nemo/…` | ✓ | ✓ | 63.7 GB |
-| `ollama/qwen3.6:27b-mtp-bf16` · `nemo/…` | ✓ | ✓ | 53.6 GB |
-| `ollama/llama3.2:3b-instruct-fp16` · `nemo/…` | ✓ | ✗ | 6.4 GB |
+| Model in the UI                               | Tools / Agent mode | Thinking | VRAM (100 % GPU) |
+|-----------------------------------------------|--------------------|----------|------------------|
+| `ollama/gemma3:27b-it-fp16` · `nemo/…`        | ✗                  | ✗        | 55.0 GB          |
+| `ollama/gemma4:31b-it-bf16` · `nemo/…`        | ✓                  | ✓        | 63.7 GB          |
+| `ollama/qwen3.6:27b-mtp-bf16` · `nemo/…`      | ✓                  | ✓        | 53.6 GB          |
+| `ollama/llama3.2:3b-instruct-fp16` · `nemo/…` | ✓                  | ✗        | 6.4 GB           |
 
 Gemma 3 cannot do tool calling (`ollama show` reports only `completion, vision`),
 so the UI's **Agent mode** and any `responses` call carrying a `file_search`

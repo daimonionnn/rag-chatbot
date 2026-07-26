@@ -21,15 +21,15 @@ Prerequisite: the stack from [SETUP.md](SETUP.md). Defects hit here are in
 
 Its presentation documents the setup precisely, and we match it:
 
-| Parameter | Upstream PoC | Here |
-|-----------|--------------|------|
-| Embedding | Qwen3-4B, dim 2560 | `ollama/qwen3-embedding:4b-fp16`, dim 2560 |
-| Chunking | 512 tokens, overlap 64 | same |
-| Judge | Gemma-3-27B (LLM-as-judge) | `ollama/gemma3:27b-it-fp16` |
-| Framework | RAGAS, inline mode | TrustyAI provider, inline |
-| Dataset | 182 QA pairs from the *Peňaženka zdravia* FAQ | same, with their `reference` answers |
-| Vector store | PGVector | FAISS (local) |
-| Serving | vLLM on OpenShift AI | Ollama on the host |
+| Parameter    | Upstream PoC                                  | Here                                       |
+|--------------|-----------------------------------------------|--------------------------------------------|
+| Embedding    | Qwen3-4B, dim 2560                            | `ollama/qwen3-embedding:4b-fp16`, dim 2560 |
+| Chunking     | 512 tokens, overlap 64                        | same                                       |
+| Judge        | Gemma-3-27B (LLM-as-judge)                    | `ollama/gemma3:27b-it-fp16`                |
+| Framework    | RAGAS, inline mode                            | TrustyAI provider, inline                  |
+| Dataset      | 182 QA pairs from the *Peňaženka zdravia* FAQ | same, with their `reference` answers       |
+| Vector store | PGVector                                      | FAISS (local)                              |
+| Serving      | vLLM on OpenShift AI                          | Ollama on the host                         |
 
 Their repository ships the derived QA pairs but **not** the source PDFs, so the
 corpus (16 VšZP PDFs) is supplied locally in `docs/vszp/data` and ingested into a
@@ -114,13 +114,13 @@ the bare name (see [BUGS.md](BUGS.md)). Override the set with `METRICS=a,b,c`.
 Measured: **~15–17 s per (row, metric)** for scoring, and ~7 s per question for
 generation.
 
-| Scope | Wall clock |
-|-------|-----------|
-| generation, 182 questions, one model | ~21 min |
-| scoring, 182 rows × 6 metrics, one model | ~5 h |
-| **full run, one model** | **~5.3 h** |
-| full run, three models | **~16 h** |
-| 40-question subset, three models | ~3.5 h |
+| Scope                                    | Wall clock |
+|------------------------------------------|------------|
+| generation, 182 questions, one model     | ~21 min    |
+| scoring, 182 rows × 6 metrics, one model | ~5 h       |
+| **full run, one model**                  | **~5.3 h** |
+| full run, three models                   | **~16 h**  |
+| 40-question subset, three models         | ~3.5 h     |
 
 The judge and the model under test are usually different, so Ollama swaps them
 once per model (~30 s). The embedding model (8 GB) stays resident alongside the
@@ -133,14 +133,14 @@ LLM without thrashing.
 Two rows, gemma3 generating and judging, to prove the pipeline end to end before
 committing to the ~16 h full run:
 
-| Metric | Aggregate |
-|--------|-----------|
-| faithfulness | 1.000 |
-| context_precision | 1.000 |
-| context_recall | 1.000 |
-| answer_similarity | 0.975 |
-| answer_relevancy | 0.673 |
-| factual_correctness | 0.665 |
+| Metric              | Aggregate |
+|---------------------|-----------|
+| faithfulness        | 1.000     |
+| context_precision   | 1.000     |
+| context_recall      | 1.000     |
+| answer_similarity   | 0.975     |
+| answer_relevancy    | 0.673     |
+| factual_correctness | 0.665     |
 
 Two rows prove nothing about quality — they prove the wiring.
 
@@ -174,14 +174,14 @@ Ran 2026-07-25 21:56 → 2026-07-26 16:57, elapsed 1141 min (~19 h — longer th
 (from a judge reply ragas could not parse, see [BUGS.md](BUGS.md) A2) were scored
 as missing and excluded from the means below rather than zeroing the average.
 
-| Metric | gemma3 | gemma4 | qwen3.6 | Separates models? |
-|--------|-------:|-------:|--------:|:------------------:|
-| context_recall | 0.9960 | 0.9960 | 0.9932 | no — retrieval-only, see §4.1 |
-| context_precision | 0.9882 | 0.9844 | 0.9851 | no — retrieval-only, see §4.1 |
-| faithfulness | 0.9820 | **0.9872** | 0.9713 | yes |
-| answer_relevancy | 0.6030 | 0.6507 | **0.6634** | yes |
-| answer_similarity | **0.9628** | 0.9242 | 0.8914 | yes |
-| factual_correctness | **0.8885** | 0.8438 | 0.8008 | yes |
+| Metric              | gemma3     | gemma4     | qwen3.6    | Separates models?             |
+|---------------------|-----------:|-----------:|-----------:|:-----------------------------:|
+| context_recall      | 0.9960     | 0.9960     | 0.9932     | no — retrieval-only, see §4.1 |
+| context_precision   | 0.9882     | 0.9844     | 0.9851     | no — retrieval-only, see §4.1 |
+| faithfulness        | 0.9820     | **0.9872** | 0.9713     | yes                           |
+| answer_relevancy    | 0.6030     | 0.6507     | **0.6634** | yes                           |
+| answer_similarity   | **0.9628** | 0.9242     | 0.8914     | yes                           |
+| factual_correctness | **0.8885** | 0.8438     | 0.8008     | yes                           |
 
 `context_recall` came out **bit-identical** between gemma3 and gemma4 (0.9960 =
 0.9960), confirming §4.1's prediction directly: with retrieval held constant, that
@@ -189,14 +189,14 @@ metric cannot distinguish models.
 
 ### Generation and data quality
 
-| | gemma3 | gemma4 | qwen3.6 |
-|---|------:|------:|------:|
-| generation time (182 q) | 17 min | 76 min | 41 min |
-| answer length, median chars | 248 | 268 | 355 |
-| answer length, max chars | 820 | 1977 | 1919 |
-| `<think>`/`<reasoning>` tags leaked into the answer | 0 | 0 | 0 |
-| faithfulness NaN rows | 2 | 3 | 2 |
-| factual_correctness NaN rows | 1 | 5 | 0 |
+|                                                     | gemma3 | gemma4 | qwen3.6 |
+|-----------------------------------------------------|-------:|-------:|--------:|
+| generation time (182 q)                             | 17 min | 76 min | 41 min  |
+| answer length, median chars                         | 248    | 268    | 355     |
+| answer length, max chars                            | 820    | 1977   | 1919    |
+| `<think>`/`<reasoning>` tags leaked into the answer | 0      | 0      | 0       |
+| faithfulness NaN rows                               | 2      | 3      | 2       |
+| factual_correctness NaN rows                        | 1      | 5      | 0       |
 
 gemma4 and qwen3.6 both advertise a `thinking` capability; gemma3 does not.
 Despite that, **no reasoning text leaked into any answer** for any model — the

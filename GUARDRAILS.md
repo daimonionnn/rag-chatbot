@@ -25,10 +25,10 @@ rag-ui → llamastack ─┬─ ollama/<model>  → host Ollama              (no
 Both providers are registered for every model, which turns the UI's model picker
 into the guardrails on/off switch:
 
-| Model in the UI | Behaviour |
-|-----------------|-----------|
-| `ollama/gemma3:27b-it-fp16` | direct, no rails |
-| `nemo/gemma3:27b-it-fp16` | input + output rails applied |
+| Model in the UI             | Behaviour                    |
+|-----------------------------|------------------------------|
+| `ollama/gemma3:27b-it-fp16` | direct, no rails             |
+| `nemo/gemma3:27b-it-fp16`   | input + output rails applied |
 
 The upstream `rag-ui-patch/` is **not applied**. Our `frontend/` is newer and
 already contains `fetch_available_shields` and the `guardrail_blocked` display
@@ -42,12 +42,12 @@ Extracted verbatim from the upstream ConfigMap into
 [`nemo-local/configs/rag/`](nemo-local/configs/rag/) — a Slovak assistant for
 VšZP's *Peňaženka zdravia*:
 
-| Stage | Flow | Implementation |
-|-------|------|----------------|
-| input | `check forbidden words` | `actions.py`, blocklist: hack, exploit, violence, illegal |
-| input | `check language` | fastText language ID, allows only `sk`/`cs` |
-| input | `self check input` | LLM-judged against a policy prompt |
-| output | `self check output` | LLM-judged against a policy prompt |
+| Stage  | Flow                    | Implementation                                            |
+|--------|-------------------------|-----------------------------------------------------------|
+| input  | `check forbidden words` | `actions.py`, blocklist: hack, exploit, violence, illegal |
+| input  | `check language`        | fastText language ID, allows only `sk`/`cs`               |
+| input  | `self check input`      | LLM-judged against a policy prompt                        |
+| output | `self check output`     | LLM-judged against a policy prompt                        |
 
 Refusals are Slovak, e.g. *"Prepáčte, nemôžem pomôcť s touto témou."* and
 *"Prepáčte, tento asistent komunikuje len v slovenčine."*

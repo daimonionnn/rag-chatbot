@@ -11,8 +11,8 @@ ak sa preklad a originál rozchádzajú, platí originál.
 | [`SETUP.md`](../../SETUP.md)                         | [SETUP.md](SETUP.md)           | `ddb460e`       |
 | [`GUARDRAILS.md`](../../GUARDRAILS.md)               | [GUARDRAILS.md](GUARDRAILS.md) | `9e09e2a`       |
 | [`EVALUATION.md`](../../EVALUATION.md)               | [EVALUATION.md](EVALUATION.md) | `ddb460e`       |
-| [`EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) | — *nepreložené*                | —               |
-| [`BUGS.md`](../../BUGS.md)                           | — *nepreložené*                | —               |
+| [`EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) | [EVALUATION-LIMITS.md](EVALUATION-LIMITS.md) | `ddb460e` |
+| [`BUGS.md`](../../BUGS.md)                           | [BUGS.md](BUGS.md)             | `ddb460e` |
 
 ## Kontrola aktuálnosti
 

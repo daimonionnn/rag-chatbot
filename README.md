@@ -14,6 +14,21 @@ cluster.
 None of them runs as shipped on a workstation, and the first one does not run
 *at all* as shipped — see [BUGS.md](BUGS.md).
 
+They are referenced, not vendored: nothing inside them is modified, they are
+gitignored, and every adaptation lives beside them instead (a compose override,
+a locally built image, build-time patches — see [Layout](#layout)). Because
+`BUGS.md` and `EVALUATION.md` quote exact line numbers and behaviour from
+specific commits, `./fetch-upstream.sh` clones all four **pinned to the commits
+everything here was verified against**, rather than whatever upstream happens to
+contain today:
+
+```bash
+./fetch-upstream.sh
+```
+
+Re-running it is a no-op once the clones are at the pinned commits, and it
+un-shallows and moves them if a pin is ever updated.
+
 ---
 
 ## Documentation
@@ -63,6 +78,9 @@ Assumes the one-time setup in [SETUP.md](SETUP.md) is done (podman, Ollama, the
 locally built Llama Stack image, models pulled).
 
 ```bash
+# 0. pinned upstream clones (see "Upstream" above)
+./fetch-upstream.sh
+
 # 1. host Ollama, listening on all interfaces, with a capped context
 OLLAMA_HOST=0.0.0.0:11434 OLLAMA_KEEP_ALIVE=60m OLLAMA_CONTEXT_LENGTH=32768 \
     nohup ollama serve > ~/development/rag-chatbot/ollama-serve.log 2>&1 &
@@ -104,6 +122,7 @@ rag-eval/                RAGAS harness (run_rag.py -> score_ragas.py)
 ingest-0.6.0.py          document ingestion via the 0.6.0 Files/Vector-Stores API
 compose-model-override.yml  overrides the model hardcoded upstream, leaving the
                             upstream compose file untouched
+fetch-upstream.sh        clones the four repos below, pinned to verified commits
 RAG/ nemo-guardrails/ ragas-poc/ ragas-provider/   upstream clones (gitignored)
 docs/                    internal documents (gitignored)
 ```

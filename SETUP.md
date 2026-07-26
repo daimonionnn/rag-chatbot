@@ -213,6 +213,12 @@ Documents can also be added interactively from the UI's **Upload** page.
 
 ## 1.6 Day-to-day operation
 
+`./start-stack.sh` from the repo root starts everything (host Ollama,
+`nemo-guardrails`, `llamastack`, `rag-ui`) and is idempotent — safe to re-run any
+time, including after stopping containers to free VRAM for something else.
+
+To drive `llamastack`/`rag-ui` by hand instead:
+
 ```bash
 cd RAG/deploy/local && export PATH="$HOME/.local/bin:$PATH"
 

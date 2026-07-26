@@ -181,6 +181,7 @@ why that attempt was abandoned in favour of aligning to 0.6.0.
 | E8 | killing a pull needs care | the first `kill` hit only the wrapper process, leaving a second `ollama pull` running — two downloads then shared the link. Check with `pgrep -af` |
 | E9 | podman `depends_on` blocks removal | `podman rm -f rag-llamastack` fails while `rag-ui` exists; remove dependents first |
 | E10 | `pkill -f` can kill its own shell | the pattern appears in the invoking command's own argv, so `pkill -f "ollama pull"` matched and killed the shell running it. Use a port (`fuser -k`) or a regex that cannot self-match |
+| E11 | one stopped container breaks a subset of models with no local clue | `nemo-guardrails` was stopped (with everything else) to free VRAM for a benchmark, then only `llamastack`/`rag-ui` were restarted afterward. Ollama and every `ollama/*` model worked fine; every `nemo/*` model in the UI answered `HTTP 500` with nothing in the chatbot's own logs pointing at "the guardrails container isn't running" — the failure surfaces one layer away from its cause. Fixed by `./start-stack.sh` (repo root), which starts all four pieces together and is safe to re-run any time |
 
 ---
 

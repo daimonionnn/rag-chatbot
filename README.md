@@ -78,25 +78,24 @@ Assumes the one-time setup in [SETUP.md](SETUP.md) is done (podman, Ollama, the
 locally built Llama Stack image, models pulled).
 
 ```bash
-# 0. pinned upstream clones (see "Upstream" above)
-./fetch-upstream.sh
+./fetch-upstream.sh   # 0. pinned upstream clones (see "Upstream" above)
+./start-stack.sh      # 1-3. host Ollama + nemo-guardrails + llamastack + rag-ui
+```
 
-# 1. host Ollama, listening on all interfaces, with a capped context
-OLLAMA_HOST=0.0.0.0:11434 OLLAMA_KEEP_ALIVE=60m OLLAMA_CONTEXT_LENGTH=32768 \
-    nohup ollama serve > ~/development/rag-chatbot/ollama-serve.log 2>&1 &
+`start-stack.sh` starts every piece — Ollama on the host, the NeMo Guardrails
+proxy, and the llamastack/rag-ui containers — and is **idempotent**: it only
+starts what isn't already up, so re-running it after freeing VRAM (stopping
+containers to make room for something else) brings everything back with one
+command instead of remembering which four pieces there are. That is exactly the
+failure mode it exists to prevent: `nemo-guardrails` being left stopped while
+Ollama and llamastack kept running made every `nemo/*` model answer with a
+generic HTTP 500 in the UI, with no indication anywhere that the guardrails
+container was the missing piece (see [BUGS.md](BUGS.md)).
 
-# 2. guardrails proxy (optional — only needed for the nemo/* models)
-podman run -d --name nemo-guardrails --network local_rag-network -p 9000:9000 \
-  -e OPENAI_API_KEY=dummy -e MAIN_MODEL_BASE_URL=http://172.17.0.1:11434/v1 \
-  localhost/nemo-guardrails:local
+Load documents once (not part of `start-stack.sh` — re-running ingestion creates
+duplicate vector stores rather than being a no-op):
 
-# 3. the chatbot
-cd RAG/deploy/local && export PATH="$HOME/.local/bin:$PATH"
-OLLAMA_URL=http://172.17.0.1:11434 TAVILY_SEARCH_API_KEY=disabled \
-  podman-compose -f podman-compose.yml -f ../../../compose-model-override.yml \
-  up -d llamastack rag-ui
-
-# 4. load documents once
+```bash
 .client06-venv/bin/python ingest-0.6.0.py                       # demo corpus
 .client06-venv/bin/python ingest-0.6.0.py http://localhost:8321 docs/vszp/data vszp
 ```
@@ -123,6 +122,8 @@ ingest-0.6.0.py          document ingestion via the 0.6.0 Files/Vector-Stores AP
 compose-model-override.yml  overrides the model hardcoded upstream, leaving the
                             upstream compose file untouched
 fetch-upstream.sh        clones the four repos below, pinned to verified commits
+start-stack.sh           starts host Ollama + nemo-guardrails + llamastack/rag-ui;
+                        idempotent, safe to re-run any time
 RAG/ nemo-guardrails/ ragas-poc/ ragas-provider/   upstream clones (gitignored)
 docs/                    internal documents (gitignored)
 ```

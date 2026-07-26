@@ -138,52 +138,230 @@ explanation (bad PDFs) was wrong.
 
 ## C. Unpinned / drifted dependencies
 
-| #   | Where | What resolved | Symptom | Fix |
-|-----|-----|-----|-----|-----|
-| C1  | `llama stack build`'s generated Containerfile installs `llama-stack` unpinned | 0.7.x instead of 0.2.9 | entrypoint `llama_stack.distribution.server.server` no longer exists in 0.7.x — container would not even start | pin the version being built |
-| C2  | `datasets` (transitively, for the 0.2.9 attempt) | 1.1.1 (from 2020) | `AttributeError: module 'pyarrow' has no attribute 'PyExtensionType'` at server startup | force `datasets>=3` |
-| C3  | `llama-stack 0.6.0` declares `llama-stack-api` with **no bound** | 0.7.2 | `ImportError: cannot import name 'agents' from 'llama_stack_api'` — the CLI would not even load | pin all three llama-stack packages to 0.6.0 |
-| C4  | `ragas 0.4.3` declares `langchain`, `langchain-core`, `langchain-community` with **no bounds** | langchain-community 0.4.2 | `ModuleNotFoundError: langchain_community.chat_models.vertexai` — ragas would not import | `langchain-community>=0.3,<0.4` |
-| C5  | provider docs' own note | — | `inline/files/localfs` errors with "greenlet not found" | `greenlet==3.2.4` |
-| C6  | `trl` → `liger_kernel` (0.2.9 attempt) | — | `ModuleNotFoundError: liger_kernel` crashed startup via the `post_training` provider | dropped the training providers from the run config entirely — a RAG chatbot needs none of them |
-
 C1–C3 and C6 were all hit while trying to reproduce the 0.2.9 image, which is
 why that attempt was abandoned in favour of aligning to 0.6.0.
+
+### C1. `llama stack build` installs `llama-stack` unpinned
+
+Its generated Containerfile pulls whatever is current — 0.7.x instead of the
+0.2.9 being built. The entrypoint `llama_stack.distribution.server.server` no
+longer exists in 0.7.x, so the container would not even start.
+
+**Fix:** pin the version being built.
+
+### C2. `datasets` resolves to 1.1.1, from 2020
+
+Pulled transitively during the 0.2.9 attempt. Fails at server startup with
+`AttributeError: module 'pyarrow' has no attribute 'PyExtensionType'`.
+
+**Fix:** force `datasets>=3`.
+
+### C3. `llama-stack 0.6.0` declares `llama-stack-api` with no bound
+
+Resolves to 0.7.2, and the CLI then will not even load:
+`ImportError: cannot import name 'agents' from 'llama_stack_api'`.
+
+**Fix:** pin all three llama-stack packages to 0.6.0.
+
+### C4. `ragas 0.4.3` declares its langchain trio with no bounds
+
+`langchain`, `langchain-core` and `langchain-community` are all unbounded;
+langchain-community resolves to 0.4.2, where the module ragas imports is gone —
+`ModuleNotFoundError: langchain_community.chat_models.vertexai`. ragas does not
+import at all.
+
+**Fix:** `langchain-community>=0.3,<0.4`.
+
+### C5. `greenlet` missing
+
+Flagged in the provider's own docs: `inline/files/localfs` errors with
+"greenlet not found".
+
+**Fix:** `greenlet==3.2.4`.
+
+### C6. `trl` drags in `liger_kernel`
+
+During the 0.2.9 attempt, `ModuleNotFoundError: liger_kernel` crashed startup by
+way of the `post_training` provider.
+
+**Fix:** dropped the training providers from the run config entirely — a RAG
+chatbot needs none of them.
 
 ---
 
 ## D. API / config drift
 
-| #   | Symptom | Cause | Fix |
-|-----|-----|-----|-----|
-| D1  | UI gets `HTTP 426 "Client version 0.6.0 is not compatible with server version 0.2.9"` | the repo pins UI client 0.6.0 against a 0.2.9 server image | align the server to 0.6.0 (`LLAMA_STACK_DISABLE_VERSION_CHECK=1` alone is not enough — see D2) |
-| D2  | with the version check off, UI calls `404` | `vector_stores`, `responses`, `conversations`, `chat/completions` do not exist before 0.6.0 | same: align the server, do not paper over the check |
-| D3  | `ValueError: You must provide a URL … to use vLLM` although the config has one | 0.6.0's `remote::vllm` expects `base_url`; upstream's backup run-config uses the older `url:`, which is silently ignored | use `base_url` |
-| D4  | `Embedding model 'X' not found. Available: ['sentence-transformers/sentence-transformers/…']` | `vector_stores.default_embedding_model` is looked up as `provider_id/model_id`, so `model_id` must repeat the provider's own model path | reference the full identifier |
-| D5  | `nemoguardrails` refuses the config: "0.21-style LangChain conventions" | ≥0.23 renamed `openai_api_base` → `base_url` | rename the key |
-| D6  | NeMo `/v1/models` returns `MAIN_MODEL_BASE_URL is not set`, breaking llama-stack's model listing | that endpoint needs the upstream base URL in the environment | set `MAIN_MODEL_BASE_URL` |
-| D7  | NeMo returns `Internal server error`; log shows `model 'rag' not found` | the `model` field of a chat request is forwarded to Ollama; passing the *config id* there is wrong | pass the real model name; the config comes from `--default-config-id` |
-| D9  | `Unknown metric: answer_correctness` (warning, then a failing job) | renamed in ragas 0.4.x | use the current names |
-| D10 | UI's "Max Tokens" slider cannot reach its own labelled maximum (stops at 4033, not 4096), and its 512 default silently truncates thinking models | two separate causes. (a) `st.slider(label, min, max, value, step)` only yields values reachable by stepping from `min`, so upstream's `(1, 4096, 512, 64)` tops out at `1 + 63*64 = 4033`. (b) On the OpenAI-compatible path, `max_tokens` caps **reasoning + content combined** — measured on gemma4 with `max_tokens=200`: reasoning ate the whole budget, `content` came back as `""` with `finish_reason=length`, i.e. a blank reply and no error. Uncapped, gemma4 spends 1686–2168 completion tokens (~900 on reasoning) | `(0, 24576, 16384, 128)` — bounds are exact multiples of the step so the ceiling is reachable, and both fit the context budget. Note `max_tokens` shares `OLLAMA_CONTEXT_LENGTH` (32768) with the prompt (~434 tokens per retrieved chunk), so a ceiling of 32000 would **never** fit even at Top K=5 and would make Ollama silently drop the retrieved chunks. Patched at container start by `patch-max-tokens-slider.py` |
+### D1. UI rejected with HTTP 426
+
+`Client version 0.6.0 is not compatible with server version 0.2.9` — the repo
+pins the UI client to 0.6.0 against a 0.2.9 server image.
+
+**Fix:** align the server to 0.6.0. `LLAMA_STACK_DISABLE_VERSION_CHECK=1` alone is
+not enough — see D2.
+
+### D2. With the version check off, the UI's calls 404
+
+`vector_stores`, `responses`, `conversations` and `chat/completions` do not exist
+before 0.6.0, so silencing the check just moves the failure.
+
+**Fix:** same as D1 — align the server rather than papering over the check.
+
+### D3. `You must provide a URL … to use vLLM`, although the config has one
+
+0.6.0's `remote::vllm` expects `base_url`. Upstream's backup run-config uses the
+older `url:` key, which is silently ignored.
+
+**Fix:** use `base_url`.
+
+### D4. `Embedding model 'X' not found`
+
+The error lists `['sentence-transformers/sentence-transformers/…']` — because
+`vector_stores.default_embedding_model` is looked up as `provider_id/model_id`,
+so `model_id` has to repeat the provider's own model path.
+
+**Fix:** reference the full identifier.
+
+### D5. `nemoguardrails` refuses the config
+
+It reports "0.21-style LangChain conventions": ≥0.23 renamed `openai_api_base`
+to `base_url`.
+
+**Fix:** rename the key.
+
+### D6. NeMo `/v1/models` returns `MAIN_MODEL_BASE_URL is not set`
+
+Which breaks llama-stack's model listing — that endpoint needs the upstream base
+URL in the environment.
+
+**Fix:** set `MAIN_MODEL_BASE_URL`.
+
+### D7. NeMo returns `Internal server error`, log shows `model 'rag' not found`
+
+The `model` field of a chat request is forwarded to Ollama, so passing the
+*config id* there is wrong.
+
+**Fix:** pass the real model name; the config comes from `--default-config-id`.
+
+### D8. Moved to A3
+
+Was "eval job dies with `KeyError: 'factual_correctness'`". Once it turned out to
+be a fixable provider defect rather than config drift, it moved to
+[A3](#a3-factual_correctness-kills-the-eval-job). The number is kept as a stub so
+existing references do not point at the wrong entry.
+
+### D9. `Unknown metric: answer_correctness`
+
+A warning, followed by a failing job. Renamed in ragas 0.4.x.
+
+**Fix:** use the current metric names.
+
+### D10. "Max Tokens" slider: unreachable ceiling, and a default that empties answers
+
+Two separate causes behind one control.
+
+**(a) The ceiling is a lie.** `st.slider(label, min, max, value, step)` only
+yields values reachable by stepping from `min`, so upstream's
+`(1, 4096, 512, 64)` tops out at `1 + 63*64 = 4033` — the next step, 4097, would
+exceed the labelled 4096.
+
+**(b) The cap covers reasoning, not just the answer.** On the OpenAI-compatible
+path, `max_tokens` limits reasoning + content *combined*. Measured on gemma4 with
+`max_tokens=200`: reasoning consumed the whole budget, `content` came back as
+`""` with `finish_reason=length` — a blank reply, no error. Uncapped, gemma4
+spends 1686–2168 completion tokens per answer, ~900 of them on reasoning, so the
+512 default sat well inside the range where thinking models get emptied.
+
+**Fix:** `(0, 24576, 16384, 128)` — every bound is an exact multiple of the step,
+so the ceiling is reachable, and both fit the context budget. Note that
+`max_tokens` shares `OLLAMA_CONTEXT_LENGTH` (32768) with the prompt (~434 tokens
+per retrieved chunk), so a ceiling of 32000 would **never** fit, even at Top K=5,
+and would make Ollama silently drop the retrieved chunks. Applied at container
+start by `patch-max-tokens-slider.py`.
 
 ---
 
 ## E. Environment and operational traps
 
-| #   | Trap | Detail |
-|-----|-----|-----|
-| E1  | private container image | `llamastack/distribution-ollama:0.2.9` grants no pull scope even authenticated, and has no quay/ghcr mirror. Diagnosed by decoding the Docker Hub token: `access: []` for this repo, while `grafana/grafana` returned a normal pull grant — so it was the repo, not our auth |
-| E2  | no default registry | Ubuntu's `registries.conf` sets no `unqualified-search-registries`, so short image names in the compose file cannot resolve at all |
-| E3  | Ollama on loopback | the systemd unit binds `127.0.0.1`; rootless containers cannot reach it. Run it on `0.0.0.0` |
-| E4  | Ollama fills VRAM with KV cache | it auto-sizes context to available VRAM — a 3B model reserved **77 GB**. A 54–64 GB model would then OOM. Cap `OLLAMA_CONTEXT_LENGTH` |
-| E5  | silent CPU offload | another process (LM Studio, 73.5 GB) held VRAM, so Ollama placed only 37 % of the model on GPU and ran the rest on CPU — while `ollama ps` still listed it as loaded. Compare `size_vram` with `size`; the split is decided at load time and kept |
-| E6  | sharded GGUF cannot be imported | `ollama create` fails with `split GGUF … has 1 shards, expected 2`, so a model already downloaded by LM Studio could not be reused. The library build is also safer: it ships the chat template tool calling needs |
-| E7  | cancelled pulls leak disk | Ollama has no prune command. `blobs/*-partial*` plus blobs unreferenced by any manifest came to **98 GB** here |
-| E8  | killing a pull needs care | the first `kill` hit only the wrapper process, leaving a second `ollama pull` running — two downloads then shared the link. Check with `pgrep -af` |
-| E9  | podman `depends_on` blocks removal | `podman rm -f rag-llamastack` fails while `rag-ui` exists; remove dependents first |
-| E10 | `pkill -f` can kill its own shell | the pattern appears in the invoking command's own argv, so `pkill -f "ollama pull"` matched and killed the shell running it. Use a port (`fuser -k`) or a regex that cannot self-match |
-| E11 | one stopped container breaks a subset of models with no local clue | `nemo-guardrails` was stopped (with everything else) to free VRAM for a benchmark, then only `llamastack`/`rag-ui` were restarted afterward. Ollama and every `ollama/*` model worked fine; every `nemo/*` model in the UI answered `HTTP 500` with nothing in the chatbot's own logs pointing at "the guardrails container isn't running" — the failure surfaces one layer away from its cause. Fixed by `./start-stack.sh` (repo root), which starts all four pieces together and is safe to re-run any time |
-| E12 | a relative bind-mount `source:` in a compose *override* file resolves against the wrong directory | `compose-model-override.yml` (repo root) declared `volumes: [./patch-max-tokens-slider.py:...]`; podman-compose resolved `./` against the **base** compose file's directory (`RAG/deploy/local`), not the override file's own directory. The path didn't exist there, so podman silently bind-mounted an auto-created **empty directory** instead of erroring — the container then crash-looped on `python /tmp/patch-....py` with the distinctly unhelpful `can't find '__main__' module in '/tmp/patch-....py'` (Python's error for "this is a directory, not a script"). Worse, the empty directory was created *inside the pinned, gitignored `RAG/` clone*. Use an absolute path for bind-mount sources declared in an override file |
+### E1. The container image is private
+
+`llamastack/distribution-ollama:0.2.9` grants no pull scope even when
+authenticated, and has no quay/ghcr mirror. Diagnosed by decoding the Docker Hub
+token: `access: []` for this repo, while `grafana/grafana` returned a normal pull
+grant — so it was the repo, not our credentials.
+
+### E2. No default registry
+
+Ubuntu's `registries.conf` sets no `unqualified-search-registries`, so the short
+image names in the compose file cannot resolve at all.
+
+### E3. Ollama binds loopback
+
+The systemd unit listens on `127.0.0.1`, which rootless containers cannot reach.
+Run it on `0.0.0.0`.
+
+### E4. Ollama fills VRAM with KV cache
+
+It auto-sizes context to the available VRAM — a 3B model reserved **77 GB**. A
+54–64 GB model would then OOM. Cap `OLLAMA_CONTEXT_LENGTH`.
+
+### E5. Silent CPU offload
+
+Another process (LM Studio, holding 73.5 GB) left too little VRAM, so Ollama
+placed only 37 % of the model on the GPU and ran the rest on CPU — while
+`ollama ps` still listed it as loaded. Compare `size_vram` with `size`; the split
+is decided at load time and kept.
+
+### E6. Sharded GGUF cannot be imported
+
+`ollama create` fails with `split GGUF … has 1 shards, expected 2`, so a model
+already downloaded by LM Studio could not be reused. The library build is also
+the safer choice: it ships the chat template tool calling depends on.
+
+### E7. Cancelled pulls leak disk
+
+Ollama has no prune command. `blobs/*-partial*` plus blobs unreferenced by any
+manifest came to **98 GB** here.
+
+### E8. Killing a pull needs care
+
+The first `kill` hit only the wrapper process, leaving a second `ollama pull`
+running — two downloads then shared the link. Check with `pgrep -af`.
+
+### E9. podman `depends_on` blocks removal
+
+`podman rm -f rag-llamastack` fails while `rag-ui` exists. Remove dependents
+first.
+
+### E10. `pkill -f` can kill its own shell
+
+The pattern appears in the invoking command's own argv, so
+`pkill -f "ollama pull"` matched and killed the shell running it. Use a port
+(`fuser -k`) or a regex that cannot self-match.
+
+### E11. One stopped container breaks a subset of models, with no local clue
+
+`nemo-guardrails` was stopped (along with everything else) to free VRAM for a
+benchmark, and afterwards only `llamastack`/`rag-ui` were restarted. Ollama and
+every `ollama/*` model worked fine; every `nemo/*` model in the UI answered
+`HTTP 500`, with nothing in the chatbot's own logs pointing at "the guardrails
+container isn't running" — the failure surfaces one layer away from its cause.
+
+**Fix:** `./start-stack.sh` (repo root) starts all four pieces together and is
+safe to re-run any time.
+
+### E12. A relative bind-mount source in a compose *override* resolves elsewhere
+
+`compose-model-override.yml` (repo root) declared
+`volumes: [./patch-max-tokens-slider.py:...]`. podman-compose resolved `./`
+against the **base** compose file's directory (`RAG/deploy/local`), not the
+override file's own. The path did not exist there, so podman silently
+bind-mounted an auto-created **empty directory** rather than erroring — and the
+container crash-looped on `python /tmp/patch-....py` with the distinctly
+unhelpful `can't find '__main__' module in '/tmp/patch-....py'`, which is
+Python's way of saying "this is a directory, not a script". Worse, the empty
+directory was created *inside the pinned, gitignored `RAG/` clone*.
+
+**Fix:** use an absolute path for bind-mount sources declared in an override file.
 
 ---
 

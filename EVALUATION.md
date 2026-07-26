@@ -147,3 +147,21 @@ lower `answer_relevancy` is expected to move most once a real sample is run.
 
 **A full benchmark has not been run yet** — the scope decision (which models, how
 many questions) is open.
+
+---
+
+## 3.6 Before trusting the numbers
+
+Read [EVALUATION-LIMITS.md](EVALUATION-LIMITS.md). The short version, all
+measured on this stack:
+
+- Only **four** of the six metrics can separate the models; two of them never see
+  the answer and measure the shared retrieval layer instead.
+- 99 % of the questions **and** their reference answers appear verbatim in a PDF
+  that is in the corpus, so this is closer to a retrieval-and-copy task than a
+  reasoning benchmark.
+- `answer_similarity` scores a **negated fact** or a **10× wrong euro amount** at
+  ~0.99, while a **fully correct answer in English** scores 0.83 — it is a
+  fluency-and-topic check, not a correctness check.
+- **No metric measures Slovak language quality**, so a fluent-Czech or
+  broken-Slovak answer would pass unflagged.

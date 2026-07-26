@@ -47,6 +47,31 @@ SYSTEM_PROMPT = (
     "vecne a po slovensky. Ak odpoveď v kontexte nie je, povedz to."
 )
 
+# gemma4 and qwen3.6 advertise a `thinking` capability; gemma3 does not. If a
+# model emits its reasoning inline, that text would be scored as if it were the
+# answer, penalising the thinking models for something that is not a quality
+# difference. Strip the usual wrappers and say so in the log, so the comparison
+# stays about the answers.
+THINK_BLOCK = re.compile(
+    r"<(think|thinking|reasoning)\b[^>]*>.*?</\1>", re.S | re.I)
+THINK_OPEN = re.compile(r"^\s*<(think|thinking|reasoning)\b[^>]*>.*", re.S | re.I)
+
+
+def strip_reasoning(text: str) -> tuple[str, bool]:
+    """Return (answer, stripped?) with any inline reasoning block removed.
+
+    Never returns empty: if stripping would leave nothing (an unclosed block,
+    i.e. the reply was reasoning all the way to the end) the original text is
+    kept and `stripped` is False, so the log does not claim a clean-up that
+    did not happen.
+    """
+    original = text.strip()
+    cleaned = THINK_BLOCK.sub("", text)
+    if THINK_OPEN.match(cleaned):
+        cleaned = ""
+    answer = cleaned.strip() or original
+    return answer, answer != original
+
 
 def main() -> None:
     if len(sys.argv) < 2:
@@ -63,7 +88,7 @@ def main() -> None:
         questions = questions[:limit]
 
     print(f"model={model}  store={store.id}  questions={len(questions)}")
-    rows, started = [], time.time()
+    rows, started, n_stripped = [], time.time(), 0
     for n, item in enumerate(questions, 1):
         q = item["user_input"]
         hits = client.vector_stores.search(
@@ -78,6 +103,9 @@ def main() -> None:
                             f"\n\nOtázka: {q}"},
             ],
         ).choices[0].message.content or ""
+        answer, stripped = strip_reasoning(answer)
+        if stripped:
+            n_stripped += 1
         rows.append({
             "user_input": q,
             "response": answer,
@@ -94,6 +122,9 @@ def main() -> None:
     out.write_text(json.dumps(rows, ensure_ascii=False, indent=2))
     print(f"\nwrote {out}  ({len(rows)} rows, "
           f"{(time.time() - started) / 60:.1f} min total)")
+    if n_stripped:
+        print(f"NOTE: stripped inline reasoning from {n_stripped}/{len(rows)} "
+              f"answers (model emits thinking tokens)")
 
 
 if __name__ == "__main__":

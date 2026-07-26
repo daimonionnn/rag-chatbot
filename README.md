@@ -23,6 +23,7 @@ None of them runs as shipped on a workstation, and the first one does not run
 | 1 | **[SETUP.md](SETUP.md)** | Local runnable setup: prerequisites, the Llama Stack image we build, models, ingestion, day-to-day operation |
 | 2 | **[GUARDRAILS.md](GUARDRAILS.md)** | NeMo Guardrails as a transparent proxy, the rails, and how the UI exposes rails-on/off |
 | 3 | **[EVALUATION.md](EVALUATION.md)** | RAGAS evaluation through the TrustyAI llama-stack provider, metrics, and the harness |
+| 4 | **[EVALUATION-LIMITS.md](EVALUATION-LIMITS.md)** | What the evaluation does *not* measure — measured blind spots (facts vs. fluency, Slovak untested) and a prioritised improvement backlog |
 | — | **[BUGS.md](BUGS.md)** | Every defect and trap hit across the project, with the fix |
 
 ---

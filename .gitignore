@@ -7,7 +7,8 @@ ragas-poc/
 ragas-provider/
 
 # Internal documents — kept locally, never committed
-docs/
+docs/*
+!docs/sk-translation/
 
 # Evaluation artefacts: generated, and derived from the internal docs above
 rag-eval/results/

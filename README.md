@@ -97,7 +97,7 @@ duplicate vector stores rather than being a no-op):
 
 ```bash
 .client06-venv/bin/python ingest-0.6.0.py                       # demo corpus
-.client06-venv/bin/python ingest-0.6.0.py http://localhost:8321 docs/vszp/data vszp
+.client06-venv/bin/python ingest-0.6.0.py http://localhost:8321 docs/data/vszp vszp
 ```
 
 Open **<http://localhost:8501>**.

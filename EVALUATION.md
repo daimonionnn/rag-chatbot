@@ -32,7 +32,7 @@ Its presentation documents the setup precisely, and we match it:
 | Serving      | vLLM on OpenShift AI                          | Ollama on the host                         |
 
 Their repository ships the derived QA pairs but **not** the source PDFs, so the
-corpus (16 VšZP PDFs) is supplied locally in `docs/vszp/data` and ingested into a
+corpus (16 VšZP PDFs) is supplied locally in `docs/data/vszp` and ingested into a
 single `vszp` store.
 
 Retrieval on Slovak is near-exact after the embedding switch — for the first eval

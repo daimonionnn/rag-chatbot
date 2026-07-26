@@ -196,7 +196,7 @@ Files + Vector-Stores API — the server does the chunking (pypdf) and embedding
 .client06-venv/bin/python ingest-0.6.0.py
 
 # everything into one store — what an evaluation corpus wants
-.client06-venv/bin/python ingest-0.6.0.py http://localhost:8321 docs/vszp/data vszp
+.client06-venv/bin/python ingest-0.6.0.py http://localhost:8321 docs/data/vszp vszp
 ```
 
 Chunking is 512 tokens with overlap 64, and embeddings are Qwen3-4B (dim 2560),

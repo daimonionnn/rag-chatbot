@@ -10,8 +10,8 @@ ak sa preklad a originál rozchádzajú, platí originál.
 | [`README.md`](../../README.md)                       | [README.md](README.md)         | `9e09e2a`       |
 | [`SETUP.md`](../../SETUP.md)                         | [SETUP.md](SETUP.md)           | `2d041a2`       |
 | [`GUARDRAILS.md`](../../GUARDRAILS.md)               | [GUARDRAILS.md](GUARDRAILS.md) | `9e09e2a`       |
-| [`EVALUATION.md`](../../EVALUATION.md)               | [EVALUATION.md](EVALUATION.md) | `1a8de5d`       |
-| [`EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) | [EVALUATION-LIMITS.md](EVALUATION-LIMITS.md) | `1a8de5d` |
+| [`EVALUATION.md`](../../EVALUATION.md)               | [EVALUATION.md](EVALUATION.md) | `4017d16`       |
+| [`EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) | [EVALUATION-LIMITS.md](EVALUATION-LIMITS.md) | `4017d16` |
 | [`BUGS.md`](../../BUGS.md)                           | [BUGS.md](BUGS.md)             | `1a8de5d` |
 
 ## Kontrola aktuálnosti

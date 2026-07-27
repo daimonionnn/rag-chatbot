@@ -454,6 +454,31 @@ explicit. Two traps in doing it by text substitution:
 The patch `ast.parse`s the result before writing and refuses to write otherwise,
 then asserts no callback survived — editing Python with a regex earns both.
 
+### D12. `think: false` is silently ignored on the OpenAI-compatible path
+
+Ollama can turn a model's reasoning off, but only on its **own** `/api/chat`
+endpoint. Send the same field to `/v1/chat/completions` — the OpenAI-compatible
+path that llama-stack and therefore the whole evaluation harness use — and it is
+accepted, returns 200, and does nothing. No error, no warning, no unsupported-
+parameter message. A benchmark "with thinking disabled" would have measured
+thinking-enabled answers and reported a null result.
+
+Measured on the native endpoint, where it does work:
+
+| Model                  | `think`   | reasoning chars | `eval_count` |
+|------------------------|-----------|----------------:|-------------:|
+| `gemma4:31b-it-bf16`   | *default* | 747             | 237          |
+| `gemma4:31b-it-bf16`   | `false`   | **0**           | **24**       |
+| `qwen3.6:27b-mtp-bf16` | *default* | 604             | 173          |
+| `qwen3.6:27b-mtp-bf16` | `false`   | **0**           | **26**       |
+
+**Fix:** `run_rag.py --no-think` routes *generation* straight to Ollama's native
+API, leaving retrieval on llama-stack. Because the flag is a request rather than a
+guarantee, the run also counts the reasoning that actually came back and prints
+it, so a model that ignores the flag cannot be mistaken for one that complied —
+the whole point being that the silent version of this failure is what makes it
+dangerous. Results in EVALUATION.md §3.8.
+
 ---
 
 ## E. Environment and operational traps

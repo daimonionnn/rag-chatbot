@@ -194,6 +194,31 @@ interval, so **a one- or two-point gap between models is not interpretable.**
 floor. Then only report differences that exceed it. Cheap version: repeat on 40
 rows rather than 182.
 
+**Partly resolved, 2026-07-27.** The thinking-vs-no-thinking experiment
+([EVALUATION.md §3.8](EVALUATION.md)) supplied a noise floor as a by-product, at
+no extra cost. It re-ran both thinking models against the same judge and the
+**same retrieved contexts, reused byte-for-byte**, so `context_precision` and
+`context_recall` — which score retrieval, not the answer — had nothing real left
+to measure. What they moved by is the judge disagreeing with itself:
+
+| Retrieval metric  | gemma4 Δ | qwen3.6 Δ |
+|-------------------|---------:|----------:|
+| context_precision | −0.0014  | −0.0063   |
+| context_recall    | −0.0027  | +0.0000   |
+
+So **|Δ| up to roughly 0.006 is noise on this harness**, and `context_recall`
+reproducing to the digit for qwen3.6 shows the pipeline itself is stable. Applied
+to §3.7's table, that is enough to kill the smaller cross-model gaps and to
+confirm the larger ones — and it already reclassified one finding: gemma4's
+`factual_correctness` change under no-thinking (−0.0051) was first read as a weak
+signal and is, against this floor, noise.
+
+This is still not the full fix. It is one paired comparison per model, not the
+3–5 repeats above, so it gives an order of magnitude rather than a confidence
+interval, and it says nothing about the noise on `answer_relevancy` or
+`factual_correctness` specifically — the two metrics where the judge does the most
+work and is therefore likeliest to be least stable.
+
 ---
 
 ## 4.7 Things not measured at all

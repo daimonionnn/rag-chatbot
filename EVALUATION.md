@@ -222,3 +222,94 @@ None of these gaps should be read as a ranking without the caveats in
 measured dataset defect (duplicate questions with mismatched references) was
 found to depress `factual_correctness` for all three models, and no repeat runs
 exist to establish whether gaps this size exceed the judge's own noise.
+
+---
+
+## 3.8 What thinking is worth
+
+gemma4 and qwen3.6 both reason before answering; gemma3 does not. §3.7 measured
+them with reasoning on, which left two things unanswered: how much the reasoning
+buys, and — noted there as an open problem — whether gaps that size exceed the
+judge's own noise. One experiment settles both.
+
+Every model was re-run with reasoning disabled, against the same judge, the same
+questions, and the **same retrieved contexts, reused verbatim** from the
+thinking-enabled run (`run_rag.py --no-think`, see BUGS.md D12 for why this has to
+bypass the OpenAI-compatible path). The answer is therefore the only thing that
+differs between the two columns.
+
+Ran 2026-07-26 22:39 → 2026-07-27 10:46, elapsed 726 min, zero job failures.
+`think: false` was confirmed to work rather than assumed: reasoning came back as
+exactly **0 characters** across all 364 generations, and in a probe `eval_count`
+fell 237 → 24 (gemma4) and 173 → 26 (qwen3.6).
+
+### The noise floor, measured for free
+
+`context_precision` and `context_recall` score *retrieval*, and retrieval was held
+byte-identical across the two runs. Whatever they move by is therefore the judge
+disagreeing with itself, not an effect:
+
+| Retrieval metric  | gemma4 Δ | qwen3.6 Δ |
+|-------------------|---------:|----------:|
+| context_precision | −0.0014  | −0.0063   |
+| context_recall    | −0.0027  | +0.0000   |
+
+So on this harness **|Δ| up to about 0.006 is noise**. `context_recall` for
+qwen3.6 reproduced to the digit (+0.0000), which is the strongest available
+evidence that the pipeline itself is stable and the variation is the judge's.
+
+### Results
+
+Paired over the rows both runs scored — the NaN rows are not the same rows in
+each run, so means over the full 182 would compare different populations.
+
+| Metric              | gemma4 ON | gemma4 OFF | Δ       | qwen3.6 ON | qwen3.6 OFF | Δ       |
+|---------------------|----------:|-----------:|--------:|-----------:|------------:|--------:|
+| faithfulness        | 0.9868    | 0.9873     | +0.0005 | 0.9711     | 0.9737      | +0.0025 |
+| answer_relevancy    | 0.6507    | 0.6381     | −0.0126 | 0.6634     | 0.6413      | −0.0220 |
+| answer_similarity   | 0.9242    | 0.9223     | −0.0019 | 0.8914     | 0.9086      | +0.0172 |
+| factual_correctness | 0.8414    | 0.8363     | −0.0051 | 0.8010     | 0.8351      | +0.0341 |
+
+| Generation (182 q) | thinking on | thinking off | speed-up |
+|--------------------|------------:|-------------:|---------:|
+| gemma4             | 76.5 min    | 22.1 min     | 3.5×     |
+| qwen3.6            | 42.3 min    | 11.2 min     | 3.8×     |
+
+| Answer length, median chars | on  | off |
+|-----------------------------|----:|----:|
+| gemma4                      | 268 | 247 |
+| qwen3.6                     | 355 | 294 |
+
+### Reading it
+
+**Thinking is not uniformly better, and for qwen3.6 it is mostly worse.** Turning
+it off cost 3.5–3.8× less generation time and moved the metrics like this:
+
+- **`answer_relevancy` drops in both models** (−0.0126, −0.0220) — the only
+  consistent cost of removing reasoning, and the only effect that reproduces
+  across models.
+- **`factual_correctness` for qwen3.6 *rises* by +0.0341** — around five times the
+  noise floor, and larger than any gemma4-vs-qwen3.6 gap in §3.7. Reasoning was
+  actively hurting factual accuracy for this model on this corpus.
+- **`answer_similarity` for qwen3.6 rises by +0.0172.** This metric is
+  embedding-only, with no judge in the loop, so it carries no judge noise at all.
+- **gemma4 barely moves.** With the 0.006 floor above, only its `answer_relevancy`
+  change is real; `faithfulness`, `answer_similarity` and `factual_correctness` are
+  all inside the noise.
+- **`faithfulness` is inside the noise for both.** Reasoning does not make answers
+  more grounded in the retrieved text.
+
+One mechanism plausibly explains every direction at once: **answers get shorter**
+without reasoning (qwen3.6 median 355 → 294). Shorter answers sit closer to a
+terse FAQ-style reference, which raises `answer_similarity` and
+`factual_correctness`, and they cover less ground, which lowers `answer_relevancy`
+— exactly the length effect §3.7 already observed *across* models, reproduced here
+*within* a model. That makes the qwen3.6 gains a weaker claim than the numbers
+suggest on their own, and `answer_similarity` in particular should be read with
+[EVALUATION-LIMITS.md §4.3](EVALUATION-LIMITS.md) in hand: it scored a negated
+fact 0.9943 and a ten-times-wrong amount 0.9899, so "more similar" is not
+"more correct".
+
+The practical read: **for this corpus, reasoning is not worth its cost.** It
+triples generation time to buy roughly two points of `answer_relevancy`, and for
+qwen3.6 it gives up more `factual_correctness` than it gains anywhere.

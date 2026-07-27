@@ -455,6 +455,31 @@ Patch výsledok pred zápisom prevedie cez `ast.parse` a inak odmietne zapisova�
 potom overí, že neprežil žiadny callback — editovanie Pythonu regexom si oboje
 zaslúži.
 
+### D12. `think: false` je na OpenAI-kompatibilnej ceste ticho ignorované
+
+Ollama vie modelu vypnúť reasoning, ale len na **svojom vlastnom** endpointe
+`/api/chat`. Ak to isté pole pošlete na `/v1/chat/completions` — teda na
+OpenAI-kompatibilnú cestu, ktorú používa llama-stack a tým pádom celý evaluačný
+harness — je prijaté, vráti 200 a neurobí nič. Žiadna chyba, žiadne varovanie,
+žiadna správa o nepodporovanom parametri. Benchmark „s vypnutým thinkingom" by
+odmeral odpovede s thinkingom a nahlásil nulový výsledok.
+
+Namerané na natívnom endpointe, kde to funguje:
+
+| Model                  | `think`   | znakov reasoningu | `eval_count` |
+|------------------------|-----------|------------------:|-------------:|
+| `gemma4:31b-it-bf16`   | *default* | 747               | 237          |
+| `gemma4:31b-it-bf16`   | `false`   | **0**             | **24**       |
+| `qwen3.6:27b-mtp-bf16` | *default* | 604               | 173          |
+| `qwen3.6:27b-mtp-bf16` | `false`   | **0**             | **26**       |
+
+**Oprava:** `run_rag.py --no-think` smeruje *generovanie* priamo na natívne API
+Ollamy, pričom retrieval necháva na llama-stacku. Keďže ten flag je požiadavka
+a nie záruka, beh zároveň spočíta reasoning, ktorý sa reálne vrátil, a vypíše ho —
+takže model, ktorý flag ignoruje, sa nedá zameniť za taký, ktorý ho poslúchol.
+Celý zmysel je v tom, že nebezpečnou robí túto chybu práve jej tichosť. Výsledky
+v EVALUATION.md §3.8.
+
 ---
 
 ## E. Pasce prostredia a prevádzky

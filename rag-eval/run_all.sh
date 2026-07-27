@@ -43,7 +43,8 @@ fi
 slug() { echo "$1" | sed 's#[^A-Za-z0-9._-]#_#g'; }
 log()  { echo "[$(date '+%F %T')] $*"; }
 
-log "benchmark start | judge=$JUDGE | think=${NO_THINK:+off}${NO_THINK:-on} | models: ${MODELS[*]}"
+THINK_LABEL=$([ -n "$NO_THINK" ] && echo off || echo on)
+log "benchmark start | judge=$JUDGE | think=$THINK_LABEL | models: ${MODELS[*]}"
 START=$(date +%s)
 
 for MODEL in "${MODELS[@]}"; do

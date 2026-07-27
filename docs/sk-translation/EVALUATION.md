@@ -227,3 +227,92 @@ z [EVALUATION-LIMITS.md §4.10](EVALUATION-LIMITS.md) — najmä preto, že sa n
 konkrétna, odmeraná chyba datasetu (duplicitné otázky s nezhodnými referenciami),
 ktorá stláča `factual_correctness` u všetkých troch modelov, a neexistujú opakované
 behy, ktoré by ukázali, či rozdiely tejto veľkosti presahujú vlastný šum judge-a.
+
+---
+
+## 3.8 Čo je thinking hodný
+
+gemma4 aj qwen3.6 pred odpoveďou uvažujú; gemma3 nie. §3.7 ich merala s
+reasoningom zapnutým, čím zostali otvorené dve veci: koľko ten reasoning prinesie
+a — tam označené za otvorený problém — či rozdiely tej veľkosti presahujú vlastný
+šum judge-a. Jeden experiment vyrieši oboje.
+
+Oba modely sa prehnali znova s vypnutým reasoningom, proti rovnakému judge-ovi,
+rovnakým otázkam a **rovnakým načítaným kontextom, prevzatým verbatim** z behu
+s thinkingom (`run_rag.py --no-think`, prečo to musí obchádzať OpenAI-kompatibilnú
+cestu, je v BUGS.md D12). Jediné, čím sa tie dva stĺpce líšia, je teda odpoveď.
+
+Beh 2026-07-26 22:39 → 2026-07-27 10:46, trvanie 726 min, nula zlyhaných jobov.
+Že `think: false` funguje, sa overilo, nie predpokladalo: reasoning sa vrátil ako
+presne **0 znakov** naprieč všetkými 364 generovaniami a v probe `eval_count`
+klesol 237 → 24 (gemma4) a 173 → 26 (qwen3.6).
+
+### Noise floor, nameraný zadarmo
+
+`context_precision` a `context_recall` skórujú *retrieval*, a ten bol medzi behmi
+držaný bajtovo identický. Čímkoľvek sa pohnú, je teda judge nesúhlasiaci sám so
+sebou, nie efekt:
+
+| Retrieval metrika | gemma4 Δ | qwen3.6 Δ |
+|-------------------|---------:|----------:|
+| context_precision | −0.0014  | −0.0063   |
+| context_recall    | −0.0027  | +0.0000   |
+
+Na tomto harnesse je teda **|Δ| zhruba do 0.006 šum**. `context_recall` pre
+qwen3.6 sa zreprodukoval na cifru presne (+0.0000), čo je najsilnejší dostupný
+dôkaz, že samotná pipeline je stabilná a že tá variabilita je judge-ova.
+
+### Výsledky
+
+Párované cez riadky, ktoré oskórovali oba behy — NaN riadky nie sú v oboch tie
+isté, takže priemery cez plných 182 by porovnávali odlišné populácie.
+
+| Metrika             | gemma4 ON | gemma4 OFF | Δ       | qwen3.6 ON | qwen3.6 OFF | Δ       |
+|---------------------|----------:|-----------:|--------:|-----------:|------------:|--------:|
+| faithfulness        | 0.9868    | 0.9873     | +0.0005 | 0.9711     | 0.9737      | +0.0025 |
+| answer_relevancy    | 0.6507    | 0.6381     | −0.0126 | 0.6634     | 0.6413      | −0.0220 |
+| answer_similarity   | 0.9242    | 0.9223     | −0.0019 | 0.8914     | 0.9086      | +0.0172 |
+| factual_correctness | 0.8414    | 0.8363     | −0.0051 | 0.8010     | 0.8351      | +0.0341 |
+
+| Generovanie (182 otázok) | thinking zap | thinking vyp | zrýchlenie |
+|--------------------------|-------------:|-------------:|-----------:|
+| gemma4                   | 76,5 min     | 22,1 min     | 3,5×       |
+| qwen3.6                  | 42,3 min     | 11,2 min     | 3,8×       |
+
+| Dĺžka odpovede, medián znakov | zap | vyp |
+|-------------------------------|----:|----:|
+| gemma4                        | 268 | 247 |
+| qwen3.6                       | 355 | 294 |
+
+### Ako to čítať
+
+**Thinking nie je jednoznačne lepší a pre qwen3.6 je väčšinou horší.** Jeho
+vypnutie stálo 3,5–3,8× menej času na generovanie a s metrikami pohlo takto:
+
+- **`answer_relevancy` klesá u oboch modelov** (−0.0126, −0.0220) — jediná
+  konzistentná cena za odobratie reasoningu a jediný efekt, ktorý sa reprodukuje
+  naprieč modelmi.
+- **`factual_correctness` u qwen3.6 *stúpa* o +0.0341** — asi päťnásobok noise
+  flooru a viac než ktorýkoľvek rozdiel gemma4 vs qwen3.6 v §3.7. Reasoning tomuto
+  modelu na tomto korpuse faktickú presnosť aktívne škodil.
+- **`answer_similarity` u qwen3.6 stúpa o +0.0172.** Táto metrika je čisto
+  embedding-ová, bez judge-a v slučke, takže nenesie žiadny jeho šum.
+- **gemma4 sa takmer nehýbe.** Pri floore 0.006 je reálna len zmena
+  `answer_relevancy`; `faithfulness`, `answer_similarity` aj `factual_correctness`
+  sú všetky v šume.
+- **`faithfulness` je v šume u oboch.** Reasoning nerobí odpovede podloženejšími
+  v načítanom texte.
+
+Jeden mechanizmus vierohodne vysvetľuje všetky smery naraz: **odpovede sú bez
+reasoningu kratšie** (qwen3.6 medián 355 → 294). Kratšie odpovede sedia bližšie
+k úsečnej FAQ-referencii, čo dvíha `answer_similarity` aj `factual_correctness`,
+a pokrývajú menej, čo znižuje `answer_relevancy` — presne ten efekt dĺžky, ktorý
+§3.7 pozorovala *naprieč* modelmi, tu zreprodukovaný *vnútri* modelu. To robí
+zo ziskov qwen3.6 slabšie tvrdenie, než samotné čísla naznačujú, a najmä
+`answer_similarity` treba čítať s [EVALUATION-LIMITS.md §4.3](EVALUATION-LIMITS.md)
+v ruke: dala 0.9943 zápornej verzii faktu a 0.9899 desaťnásobne nesprávnej sume,
+takže „podobnejšie" nie je „správnejšie".
+
+Praktické čítanie: **pre tento korpus reasoning nestojí za svoju cenu.** Ztrojnásobí
+čas generovania, aby kúpil zhruba dva body `answer_relevancy`, a u qwen3.6 vzdá
+viac `factual_correctness`, než kdekoľvek získa.

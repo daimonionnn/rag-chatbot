@@ -204,6 +204,31 @@ takže **rozdiel jedného či dvoch bodov medzi modelmi nie je interpretovateľn
 prah. Potom reportovať len rozdiely, ktoré ho presahujú. Lacná verzia: opakovať na
 40 riadkoch namiesto 182.
 
+**Čiastočne vyriešené, 2026-07-27.** Experiment thinking vs. bez thinkingu
+([EVALUATION.md §3.8](EVALUATION.md)) dodal šumový prah ako vedľajší produkt, bez
+akýchkoľvek nákladov navyše. Prehnal oba thinking modely znova proti rovnakému
+judge-ovi a **rovnakým načítaným kontextom, prevzatým bajt po bajte**, takže
+`context_precision` a `context_recall` — ktoré skórujú retrieval, nie odpoveď —
+nemali čo reálne merať. Čímkoľvek sa pohli, je judge nesúhlasiaci sám so sebou:
+
+| Retrieval metrika | gemma4 Δ | qwen3.6 Δ |
+|-------------------|---------:|----------:|
+| context_precision | −0.0014  | −0.0063   |
+| context_recall    | −0.0027  | +0.0000   |
+
+Na tomto harnesse je teda **|Δ| zhruba do 0.006 šum**, a to, že sa `context_recall`
+pre qwen3.6 zreprodukoval na cifru presne, ukazuje, že samotná pipeline je
+stabilná. Aplikované na tabuľku v §3.7 to stačí na zabitie menších medzimodelových
+rozdielov a na potvrdenie tých väčších — a jedno zistenie to už preklasifikovalo:
+zmena `factual_correctness` u gemma4 bez thinkingu (−0.0051) sa najprv čítala ako
+slabý signál a proti tomuto prahu je to šum.
+
+Stále to nie je plná náprava. Je to jedno párované porovnanie na model, nie tých
+3–5 opakovaní vyššie, takže dáva rád veľkosti a nie interval spoľahlivosti,
+a nehovorí nič o šume konkrétne na `answer_relevancy` či `factual_correctness` —
+teda na tých dvoch metrikách, kde judge robí najviac práce a je teda najskôr
+najmenej stabilný.
+
 ---
 
 ## 4.7 Veci, ktoré sa nemerajú vôbec

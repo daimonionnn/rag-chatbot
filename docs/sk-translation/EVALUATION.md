@@ -1,8 +1,8 @@
-<!-- translated-from: ddb460e -->
+<!-- translated-from: 1a8de5d -->
 # 3 — RAGAS evaluácia
 
 > **Slovenský preklad.** Zdroj: [`../../EVALUATION.md`](../../EVALUATION.md)
-> v commite `ddb460e`. Anglický originál je zdroj pravdy — ak sa rozchádzajú,
+> v commite `1a8de5d`. Anglický originál je zdroj pravdy — ak sa rozchádzajú,
 > platí on. Prehľad prekladov: [INDEX.md](INDEX.md).
 
 Adaptované z dvoch vzájomne sa dopĺňajúcich upstream repozitárov:

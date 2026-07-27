@@ -1,8 +1,8 @@
-<!-- translated-from: 60c9d87 -->
+<!-- translated-from: 1a8de5d -->
 # Chyby, pasce a opravy
 
 > **Slovenský preklad.** Zdroj: [`../../BUGS.md`](../../BUGS.md) v commite
-> `60c9d87`. Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on.
+> `1a8de5d`. Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on.
 > Prehľad prekladov: [INDEX.md](INDEX.md).
 
 Všetko, čo bolo treba zdiagnostikovať, aby tento stack bežal, cez všetky tri fázy.

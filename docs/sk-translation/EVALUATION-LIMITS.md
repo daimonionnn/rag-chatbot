@@ -1,8 +1,8 @@
-<!-- translated-from: ddb460e -->
+<!-- translated-from: 1a8de5d -->
 # 4 — Čo táto evaluácia **nemeria**
 
 > **Slovenský preklad.** Zdroj:
-> [`../../EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) v commite `ddb460e`.
+> [`../../EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) v commite `1a8de5d`.
 > Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on. Prehľad
 > prekladov: [INDEX.md](INDEX.md).
 

@@ -1,8 +1,8 @@
-<!-- translated-from: 2d041a2 -->
+<!-- translated-from: 7f56dd2 -->
 # 1 — Lokálne spustiteľný setup
 
 > **Slovenský preklad.** Zdroj: [`../../SETUP.md`](../../SETUP.md) v commite
-> `2d041a2`. Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on.
+> `7f56dd2`. Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on.
 > Prehľad prekladov: [INDEX.md](INDEX.md).
 
 Ako sa chatbot z [`Sheryl-shiyi/RAG`](https://github.com/Sheryl-shiyi/RAG)

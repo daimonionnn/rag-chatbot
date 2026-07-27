@@ -1,8 +1,8 @@
-<!-- translated-from: 9e09e2a -->
+<!-- translated-from: 7f56dd2 -->
 # Enterprise RAG Chatbot — lokálna reprodukcia
 
 > **Slovenský preklad.** Zdroj: [`../../README.md`](../../README.md) v commite
-> `9e09e2a`. Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on.
+> `7f56dd2`. Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on.
 > Prehľad prekladov a ich aktuálnosť: [INDEX.md](INDEX.md).
 
 Lokálne bežiaci RAG chatbot so safety guardrails a RAGAS evaluáciou, reprodukovaný

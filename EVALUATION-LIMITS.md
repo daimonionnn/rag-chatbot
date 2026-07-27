@@ -181,6 +181,26 @@ about the judge, not the model. Scoring one model with one judge costs ~5 h here
 so a full 3×3 matrix is ~45 h — a 40-question subset makes it affordable
 (~10 h) and is enough to detect the effect.
 
+**Now load-bearing, 2026-07-27.** This stopped being a theoretical caveat once
+[EVALUATION.md §3.9](EVALUATION.md) put a ranking on the table. gemma3 comes first,
+and the metric it wins most decisively — `factual_correctness`, +0.045 over the
+next best — is judge-scored, by gemma3. The ranking and the confound point the
+same way, which is exactly the case this section warns about.
+
+Two things narrow it without closing it. `answer_similarity` has **no judge in the
+loop** (cosine similarity between embeddings) and gemma3 leads there too, so its
+closeness to the reference is not an artefact of who is judging. And that lead is
+not a length artefact either: gemma3 and gemma4-no-think produce answers of the
+same median length (248 vs 247 chars) and still differ by 0.040. What remains
+unresolved is the step from "closest to the reference" to "most correct" — and
+`answer_similarity`, per §4.3, is nearly blind to correctness, so the only metric
+that could make that step is the confounded one.
+
+**Cheapest decisive version:** the answers already exist, so no regeneration is
+needed — re-score all three models with qwen3.6 as judge, ~12 h. That is a single
+column of the 3×3 matrix and enough to answer the question actually being asked:
+does gemma3's lead survive a judge that is not gemma3?
+
 ---
 
 ## 4.6 One run, so small differences mean nothing

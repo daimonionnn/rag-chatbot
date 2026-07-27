@@ -313,3 +313,66 @@ fact 0.9943 and a ten-times-wrong amount 0.9899, so "more similar" is not
 The practical read: **for this corpus, reasoning is not worth its cost.** It
 triples generation time to buy roughly two points of `answer_relevancy`, and for
 qwen3.6 it gives up more `factual_correctness` than it gains anywhere.
+
+---
+
+## 3.9 Which model, and how far the ranking can be trusted
+
+§3.7 and §3.8 measured five configurations. Collected here on one scale, with the
+0.006 noise floor from §3.8 applied, so gaps that are not real are not read as
+rankings.
+
+| Configuration    | faithfulness | answer_relevancy | answer_similarity | factual_correctness | median chars | generation |
+|------------------|-------------:|-----------------:|------------------:|--------------------:|-------------:|-----------:|
+| **gemma3**       | 0.9820       | 0.6030           | **0.9628**        | **0.8885**          | 248          | 17 min     |
+| gemma4 think     | 0.9872       | 0.6507           | 0.9242            | 0.8438              | 268          | 76 min     |
+| gemma4 no-think  | **0.9874**   | 0.6381           | 0.9223            | 0.8361              | 247          | 22 min     |
+| qwen3.6 think    | 0.9713       | **0.6634**       | 0.8914            | 0.8008              | 355          | 41 min     |
+| qwen3.6 no-think | 0.9740       | 0.6413           | 0.9086            | 0.8351              | 294          | **11 min** |
+
+`faithfulness` does not separate gemma3 from gemma4 — 0.9820 vs 0.9874 is inside
+the noise floor. The other three have a clear winner each.
+
+**Ranking on this corpus: gemma3, then gemma4, then qwen3.6.** gemma3 takes two of
+the four metrics by margins far outside the noise (+0.039 `answer_similarity`,
++0.045 `factual_correctness` over the next best); gemma4 takes `faithfulness` but
+only within noise of gemma3; qwen3.6 takes `answer_relevancy` and is last on
+matching the reference.
+
+### It is not a length artifact
+
+§3.8 showed shorter answers score higher on the reference-matching metrics, which
+would be an obvious way to explain gemma3's lead away. It does not survive the
+data. gemma3 (248 median chars) and gemma4 no-think (247) are the same length and
+still differ by **0.040** on `answer_similarity` and **0.052** on
+`factual_correctness`. The length effect is real *within* a model and does not
+account for the gaps *between* them.
+
+### The confound that does bite
+
+**gemma3 is the judge** (§4.5), and the metric it wins most decisively,
+`factual_correctness`, is judge-scored. A judge preferring answers that look like
+its own output is the textbook shape of this, and nothing in these runs can rule
+it out.
+
+The partial counter-evidence: `answer_similarity` has **no judge in the loop** —
+it is cosine similarity between embeddings — and gemma3 leads there too, at
+identical answer length. So gemma3 genuinely produces text closest to the
+reference, judge or no judge. But `answer_similarity` is the metric §4.3 measured
+as nearly blind to correctness (0.9943 for a negated fact), so "closest to the
+reference" is not "most correct", and the metric that would settle it is the
+confounded one.
+
+**Settling it costs one more run:** re-score every model's existing answers with an
+independent judge (qwen3.6). No regeneration needed, ~12 h. If gemma3's lead
+survives a judge that is not gemma3, the ranking is about the models.
+
+### Practical recommendation
+
+- **gemma3 as the default** for this corpus: it wins reference-matching, generates
+  fastest among the non-thinking options, and is the PoC's original choice.
+- **gemma3 cannot do tool calling at all** (BUGS.md B3), so if Agent-based mode is
+  wanted it is out, and **qwen3.6 with thinking off** is the pick — fastest of all
+  five at 11 min, and `factual_correctness` 0.8351 rather than 0.8008.
+- **Do not enable thinking on either model.** It buys nothing measurable on gemma4
+  for 3.5× the generation time, and on qwen3.6 it actively costs factual accuracy.

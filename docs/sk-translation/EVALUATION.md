@@ -316,3 +316,65 @@ takže „podobnejšie" nie je „správnejšie".
 Praktické čítanie: **pre tento korpus reasoning nestojí za svoju cenu.** Ztrojnásobí
 čas generovania, aby kúpil zhruba dva body `answer_relevancy`, a u qwen3.6 vzdá
 viac `factual_correctness`, než kdekoľvek získa.
+
+---
+
+## 3.9 Ktorý model a nakoľko sa dá poradiu veriť
+
+§3.7 a §3.8 odmerali päť konfigurácií. Tu sú zozbierané na jednej škále, s noise
+floorom 0.006 z §3.8, aby sa rozdiely, ktoré nie sú reálne, nečítali ako poradie.
+
+| Konfigurácia     | faithfulness | answer_relevancy | answer_similarity | factual_correctness | medián znakov | generovanie |
+|------------------|-------------:|-----------------:|------------------:|--------------------:|--------------:|------------:|
+| **gemma3**       | 0.9820       | 0.6030           | **0.9628**        | **0.8885**          | 248           | 17 min      |
+| gemma4 think     | 0.9872       | 0.6507           | 0.9242            | 0.8438              | 268           | 76 min      |
+| gemma4 no-think  | **0.9874**   | 0.6381           | 0.9223            | 0.8361              | 247           | 22 min      |
+| qwen3.6 think    | 0.9713       | **0.6634**       | 0.8914            | 0.8008              | 355           | 41 min      |
+| qwen3.6 no-think | 0.9740       | 0.6413           | 0.9086            | 0.8351              | 294           | **11 min**  |
+
+`faithfulness` gemma3 od gemma4 neodlíši — 0.9820 vs 0.9874 je vnútri noise
+flooru. Zvyšné tri majú každá jasného víťaza.
+
+**Poradie na tomto korpuse: gemma3, potom gemma4, potom qwen3.6.** gemma3 berie
+dve zo štyroch metrík s odstupom ďaleko mimo šumu (+0.039 `answer_similarity`,
++0.045 `factual_correctness` nad druhým v poradí); gemma4 berie `faithfulness`,
+ale len v rámci šumu voči gemma3; qwen3.6 berie `answer_relevancy` a je posledná
+v zhode s referenciou.
+
+### Nie je to artefakt dĺžky
+
+§3.8 ukázala, že kratšie odpovede skórujú vyššie na metrikách zhody s referenciou,
+čím by sa dal náskok gemma3 zjavne odvysvetliť. Dáta to nepotvrdzujú. gemma3
+(medián 248 znakov) a gemma4 no-think (247) sú rovnako dlhé a napriek tomu sa
+líšia o **0.040** na `answer_similarity` a o **0.052** na `factual_correctness`.
+Efekt dĺžky je reálny *vnútri* modelu a rozdiely *medzi* nimi nevysvetľuje.
+
+### Confound, ktorý zaberá
+
+**gemma3 je judge** (§4.5) a metrika, ktorú vyhráva najpresvedčivejšie,
+`factual_correctness`, je judge-om skórovaná. Judge preferujúci odpovede, ktoré
+vyzerajú ako jeho vlastný výstup, je učebnicový tvar tohto javu a nič v týchto
+behoch ho nevie vylúčiť.
+
+Čiastočný protidôkaz: `answer_similarity` **žiadneho judge-a v slučke nemá** — je
+to kosínusová podobnosť embeddingov — a gemma3 vedie aj tam, pri rovnakej dĺžke
+odpovede. Takže gemma3 naozaj produkuje text najbližší referencii, s judge-om aj
+bez neho. Lenže `answer_similarity` je tá metrika, ktorú §4.3 odmerala ako takmer
+slepú voči správnosti (0.9943 zápornej verzii faktu), takže „najbližšie
+k referencii" nie je „najsprávnejšie" — a metrika, ktorá by ten krok urobila, je
+práve tá zaťažená confoundom.
+
+**Rozhodnúť to stojí jeden ďalší beh:** preskórovať existujúce odpovede všetkých
+modelov nezávislým judge-om (qwen3.6). Negeneruje sa nič nanovo, ~12 h. Ak náskok
+gemma3 prežije judge-a, ktorý nie je gemma3, potom je to poradie o modeloch.
+
+### Praktické odporúčanie
+
+- **gemma3 ako default** pre tento korpus: vyhráva zhodu s referenciou, generuje
+  najrýchlejšie spomedzi možností bez thinkingu a je to pôvodná voľba PoC.
+- **gemma3 nezvláda tool calling vôbec** (BUGS.md B3), takže ak sa chce
+  Agent-based mód, je mimo hru a voľbou je **qwen3.6 s vypnutým thinkingom** —
+  najrýchlejšia zo všetkých piatich s 11 min a `factual_correctness` 0.8351
+  namiesto 0.8008.
+- **Thinking nezapínať ani na jednom.** Na gemma4 nekúpi nič merateľné za 3,5×
+  dlhší čas generovania a na qwen3.6 aktívne stojí faktickú presnosť.

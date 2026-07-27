@@ -191,6 +191,26 @@ judge-a, poradie je o judge-ovi, nie o modeli. Oskórovanie jedného modelu jedn
 judge-om tu stojí ~5 h, takže plná matica 3×3 je ~45 h — podmnožina 40 otázok to
 zlacní (~10 h) a na odhalenie efektu stačí.
 
+**Odteraz nosné, 2026-07-27.** Táto výhrada prestala byť teoretická vo chvíli, keď
+[EVALUATION.md §3.9](EVALUATION.md) položila na stôl poradie. gemma3 je prvá a
+metrika, ktorú vyhráva najpresvedčivejšie — `factual_correctness`, +0.045 nad
+druhým — je skórovaná judge-om, ktorým je gemma3. Poradie aj confound ukazujú tým
+istým smerom, čo je presne prípad, pred ktorým táto sekcia varuje.
+
+Dve veci to zužujú, ale nezatvárajú. `answer_similarity` **nemá judge-a v slučke**
+(kosínusová podobnosť embeddingov) a gemma3 vedie aj tam, takže jej blízkosť
+k referencii nie je artefaktom toho, kto hodnotí. A ten náskok nie je ani
+artefaktom dĺžky: gemma3 a gemma4-no-think produkujú odpovede rovnakej mediánovej
+dĺžky (248 vs 247 znakov) a aj tak sa líšia o 0.040. Nevyriešený zostáva krok od
+„najbližšie k referencii" k „najsprávnejšie" — a `answer_similarity` je podľa §4.3
+takmer slepá voči správnosti, takže jediná metrika, ktorá by ten krok urobila, je
+tá zaťažená confoundom.
+
+**Najlacnejšia rozhodujúca verzia:** odpovede už existujú, takže sa nič
+negeneruje nanovo — preskórovať všetky tri modely s qwen3.6 ako judge-om, ~12 h. Je
+to jeden stĺpec matice 3×3 a stačí na zodpovedanie skutočne položenej otázky:
+prežije náskok gemma3 judge-a, ktorý nie je gemma3?
+
 ---
 
 ## 4.6 Jeden beh, takže malé rozdiely nič neznamenajú

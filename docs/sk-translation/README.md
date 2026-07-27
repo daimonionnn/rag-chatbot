@@ -9,6 +9,18 @@ Lokálne bežiaci RAG chatbot so safety guardrails a RAGAS evaluáciou, reproduk
 z troch upstream repozitárov na jedinej pracovnej stanici pomocou **rootless
 podmanu** a **Ollamy na hoste** — bez OpenShiftu, bez Kubeflow, bez clustra.
 
+> **Stavané a testované primárne pre slovenčinu.** Nič v stacku nie je
+> výlučne slovenské — modely, embeddingy aj retrieval sú viacjazyčné a namieriť
+> ho na anglický či iný korpus funguje — ale každé rozhodnutie tu padlo a každé
+> číslo bolo namerané na slovenčine. Prejavuje sa to na konkrétnych miestach:
+> embedding model sa vymenil za Qwen3-4B, pretože default `all-MiniLM-L6-v2` je
+> anglocentrický a na slovenčine slabý; musela sa opraviť chyba v kódovaní názvov
+> súborov, ktorá ticho zahadzovala dokumenty s `č ď ľ š ť ž` v názve; guardrails
+> obsahujú jazykovú rail; a celá evaluácia beží na 182-otázkovom slovenskom
+> korpuse. Pri inom jazyku čakaj, že setup pôjde, ale *merania* sa neprenesú —
+> a ber do úvahy, že žiadna metrika tu nehodnotí kvalitu jazyka, v žiadnom jazyku
+> (pozri [EVALUATION-LIMITS.md §4.4](EVALUATION-LIMITS.md)).
+
 | Upstream | Čo z neho preberáme |
 |-----|-----|
 | [`Sheryl-shiyi/RAG`](https://github.com/Sheryl-shiyi/RAG) (fork Red Hat `rh-ai-quickstart/RAG`) | samotný chatbot: Llama Stack + Streamlit UI + ingestion |
@@ -95,6 +107,21 @@ zabudnutý zastavený `nemo-guardrails`, kým Ollama a llamastack bežali, spôs
 nebolo vidieť, že chýbajúcim dielikom je guardrails kontajner (pozri
 [BUGS.md](BUGS.md)).
 
+`./stop-stack.sh` je zrkadlový obraz a jeho skutočnou úlohou je **vrátiť GPU**: do
+VRAM sa naraz zmestí len jeden model triedy 27B, takže čokoľvek iné, čo kartu
+chce, potrebuje tieto váhy najprv vyložiť. Zastaviť kontajnery nestačí — váhy drží
+Ollama na *hoste*, takže ich skript vyloží explicitne a výsledok potom overí proti
+`nvidia-smi`, namiesto aby ho predpokladal: vypíše, koľko sa reálne uvoľnilo, a
+pomenuje proces, ktorý kartu prípadne stále drží.
+
+```bash
+./stop-stack.sh                 # všetko dole, VRAM uvoľnená
+./stop-stack.sh --keep-ollama   # uvoľní VRAM, server nechá bežať
+```
+
+Kým beží evaluačný job, odmietne sa spustiť — plný benchmark trvá ~12 h a celý čas
+komunikuje s Ollamou aj llamastackom — pokiaľ nedostane `--force`.
+
 Dokumenty načítaj raz (nie je to súčasť `start-stack.sh` — opakovaný ingestion
 nevytvorí no-op, ale duplicitné vector stores):
 
@@ -129,6 +156,8 @@ patch-max-tokens-slider.py  opravuje slider "Max Tokens" v UI (pozri BUGS.md D10
 fetch-upstream.sh        klonuje štyri repozitáre nižšie, pripnuté na overené commity
 start-stack.sh           štartuje Ollamu na hoste + nemo-guardrails + llamastack/rag-ui;
                         idempotentný, bezpečne spustiteľný kedykoľvek
+stop-stack.sh            zastaví všetky štyri a vyloží modely, aby uvoľnil VRAM;
+                        výsledok overí, počas evaluácie sa odmietne spustiť
 RAG/ nemo-guardrails/ ragas-poc/ ragas-provider/   upstream klony (v gitignore)
 docs/                    interné dokumenty (v gitignore, okrem sk-translation/)
 ```

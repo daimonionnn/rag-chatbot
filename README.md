@@ -5,6 +5,19 @@ reproduced from three upstream repositories on a single workstation with
 **rootless podman** and **Ollama on the host** — no OpenShift, no Kubeflow, no
 cluster.
 
+> **Built and tested primarily for Slovak.** Nothing in the stack is
+> Slovak-only — the models, embeddings and retrieval are all multilingual, and
+> pointing it at an English or other-language corpus works — but every choice
+> here was made and every number measured on Slovak. That shows up in concrete
+> places: the embedding model was switched to Qwen3-4B because the default
+> `all-MiniLM-L6-v2` is English-centric and weak on Slovak; a filename-encoding
+> bug that silently dropped documents with `č ď ľ š ť ž` in their names had to be
+> fixed; the guardrails include a language rail; and the whole evaluation runs on
+> a 182-question Slovak corpus. For another language, expect the setup to work
+> and the *measurements* not to transfer — and note that no metric here scores
+> language quality at all, in any language (see
+> [EVALUATION-LIMITS.md §4.4](EVALUATION-LIMITS.md)).
+
 | Upstream | What we take from it |
 |-----|-----|
 | [`Sheryl-shiyi/RAG`](https://github.com/Sheryl-shiyi/RAG) (fork of Red Hat `rh-ai-quickstart/RAG`) | the chatbot: Llama Stack + Streamlit UI + ingestion |
@@ -92,6 +105,21 @@ Ollama and llamastack kept running made every `nemo/*` model answer with a
 generic HTTP 500 in the UI, with no indication anywhere that the guardrails
 container was the missing piece (see [BUGS.md](BUGS.md)).
 
+`./stop-stack.sh` is the mirror image, and its real job is **handing back the
+GPU**: only one 27B-class model fits in VRAM at a time, so anything else that
+wants the card needs these weights unloaded first. Stopping the containers is not
+enough — the weights are held by Ollama on the *host*, so the script unloads them
+explicitly and then verifies against `nvidia-smi` rather than assuming, reporting
+how much was actually freed and naming any process still holding the card.
+
+```bash
+./stop-stack.sh                 # everything down, VRAM released
+./stop-stack.sh --keep-ollama   # free the VRAM, leave the server up
+```
+
+It refuses to run while an evaluation job is in flight — a full benchmark is ~12 h
+and talks to Ollama and llamastack throughout — unless given `--force`.
+
 Load documents once (not part of `start-stack.sh` — re-running ingestion creates
 duplicate vector stores rather than being a no-op):
 
@@ -126,6 +154,8 @@ patch-max-tokens-slider.py  fixes the UI's "Max Tokens" slider (see BUGS.md D10)
 fetch-upstream.sh        clones the four repos below, pinned to verified commits
 start-stack.sh           starts host Ollama + nemo-guardrails + llamastack/rag-ui;
                         idempotent, safe to re-run any time
+stop-stack.sh            stops all four and unloads the models to free VRAM;
+                        verifies the result, refuses mid-evaluation
 RAG/ nemo-guardrails/ ragas-poc/ ragas-provider/   upstream clones (gitignored)
 docs/                    internal documents (gitignored)
 ```

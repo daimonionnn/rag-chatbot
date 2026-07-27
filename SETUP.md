@@ -224,6 +224,12 @@ Documents can also be added interactively from the UI's **Upload** page.
 `nemo-guardrails`, `llamastack`, `rag-ui`) and is idempotent — safe to re-run any
 time, including after stopping containers to free VRAM for something else.
 
+`./stop-stack.sh` reverses it and is the right way to free the GPU: stopping the
+containers alone leaves the weights loaded, because Ollama holds them on the host,
+so the script unloads them and checks `nvidia-smi` to confirm. `--keep-ollama`
+releases the VRAM but leaves the server running, which makes the next start
+faster. It refuses to run while an evaluation job is in flight unless forced.
+
 To drive `llamastack`/`rag-ui` by hand instead:
 
 ```bash

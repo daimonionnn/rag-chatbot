@@ -236,6 +236,12 @@ Dokumenty sa dajú pridávať aj interaktívne zo stránky **Upload** v UI.
 spustiteľný kedykoľvek, aj po zastavení kontajnerov kvôli uvolneniu VRAM pre
 niečo iné.
 
+`./stop-stack.sh` to obracia a je to správny spôsob, ako uvoľniť GPU: samotné
+zastavenie kontajnerov nechá váhy načítané, pretože ich drží Ollama na hoste —
+skript ich teda vyloží a overí cez `nvidia-smi`. `--keep-ollama` uvoľní VRAM, ale
+server nechá bežať, čím zrýchli ďalší štart. Kým beží evaluačný job, odmietne sa
+spustiť, pokiaľ ho nevynútiš.
+
 Ak chceš `llamastack`/`rag-ui` riadiť ručne:
 
 ```bash

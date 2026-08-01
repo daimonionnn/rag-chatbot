@@ -235,8 +235,9 @@ judge is reached over chat completions rather than the raw completions endpoint
 the local judges use, which is a real caveat for cross-judge comparisons rather
 than an implementation detail — see [BUGS.md](BUGS.md) A4.
 
-Measured cost, 40 rows x 6 metrics, `claude-opus-5`: **~$11 per model**, ~62 min
-wall clock. That is no slower than a local judge (§3.4's 15-17 s per row-metric),
+Measured cost, 40 rows x 6 metrics, `claude-opus-5`: **$10.86 to $12.09 per
+model**, 59-67 min wall clock — the spread tracks how long the judged model's
+answers are, not the row count (EVALUATION.md §3.10). That is no slower than a local judge (§3.4's 15-17 s per row-metric),
 because the judge is not competing with the embedding model for the GPU — only
 the 13.3 GiB embedding model stays resident, not the 54 GB LLM.
 

@@ -388,9 +388,29 @@ including its own, and the metric it won most decisively — `factual_correctnes
 in no way a contestant, `anthropic/claude-opus-5`, and reports what moved.
 
 Nothing was regenerated. The stored answers and their retrieved contexts are read
-verbatim, so **the judge is the only thing that differs** from §3.7. Run
-2026-08-01, 40 rows per model, ~62 min and ~$11 per model, zero failed judge
-calls.
+verbatim, so **the judge is the only thing that differs** from §3.7. Ran
+2026-08-01, 40 rows per model, zero failed judge calls.
+
+| Configuration    | Wall clock | Cost       |
+|------------------|-----------:|-----------:|
+| gemma3           | 62.3 min   | $10.86     |
+| gemma4           | 59.0 min   | $10.91     |
+| qwen3.6          | 66.8 min   | $12.09     |
+| 2-row smoke test | 2.5 min    | $0.50      |
+| **total**        | **~3.2 h** | **$34.36** |
+
+**Cost scales with the length of the answers being judged, not with the row
+count.** qwen3.6's answers are 47 % longer than gemma3's in this subset (17,971
+vs 12,203 characters) against byte-identical contexts, and it cost 11 % more and
+took 13 % longer. Solving the two for a fixed and a length-proportional part puts
+roughly **76 % of the bill on the retrieved contexts and 24 % on the answers** —
+the contexts are the same for every model and dominate, while answer length moves
+the total by about a quarter of its own proportional change. The same split
+predicts gemma4 (answers 1.002× gemma3's) at $10.87 against $10.91 actual.
+
+Budget a cross-judge run from the answer lengths, then, not from the question
+count — and note this is also why the cheapest model to judge is the tersest one,
+which is a property of the model under test rather than of the judge.
 
 ### The subset, and why it is not 40 random rows
 

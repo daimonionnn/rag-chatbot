@@ -80,6 +80,12 @@ RUN python /tmp/patch-ragas-mode-metrics.py && rm /tmp/patch-ragas-mode-metrics.
 COPY patch-ragas-chat-completions.py /tmp/patch-ragas-chat-completions.py
 RUN python /tmp/patch-ragas-chat-completions.py && rm /tmp/patch-ragas-chat-completions.py
 
+# A thinking judge exceeds ragas' 180 s per-call default, and raise_exceptions:
+# false turns that into a silent NaN row. Makes the timeout settable via
+# RAGAS_TIMEOUT; unset keeps ragas' default, so fast judges are unaffected.
+COPY patch-ragas-timeout.py /tmp/patch-ragas-timeout.py
+RUN python /tmp/patch-ragas-timeout.py && rm /tmp/patch-ragas-timeout.py
+
 COPY config-0.6.0.yaml /app/config.yaml
 
 # The frontend client and this server are both 0.6.0, but keep the check off so

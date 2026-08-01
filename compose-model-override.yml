@@ -25,6 +25,12 @@ services:
       # gated on this var, so unset means the provider is skipped entirely and
       # the stack runs fully offline as before.
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      # Per-LLM-call timeout for RAGAS scoring, in seconds. Unset means ragas'
+      # own 180 s default, which is ample for a non-thinking judge (~16 s per
+      # row-metric). A thinking judge generates reasoning on every call and
+      # exceeds it — and since raise_exceptions is false, the row then becomes a
+      # silent NaN rather than an error. Raise it only for such a judge.
+      RAGAS_TIMEOUT: "${RAGAS_TIMEOUT:-}"
   rag-ui:
     # Raises the "Max Tokens" sampling-parameter slider's ceiling (and fixes it
     # actually being reachable), and stops every sidebar change from wiping the

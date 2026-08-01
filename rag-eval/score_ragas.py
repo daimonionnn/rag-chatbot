@@ -52,6 +52,11 @@ DEFAULT_METRICS = [
 METRICS = [m.strip() for m in os.environ["METRICS"].split(",")] \
     if os.environ.get("METRICS") else DEFAULT_METRICS
 
+# Judges that emit reasoning before their answer. Ollama charges that reasoning
+# to max_tokens without returning it, so these need a much larger ceiling than
+# the JSON they eventually produce would suggest — see sampling_params().
+THINKING_JUDGES = ("qwen3.6", "gemma4")
+
 
 def sampling_params(judge: str) -> dict:
     """Sampling params for the judge, which differ by where the judge runs.
@@ -73,9 +78,28 @@ def sampling_params(judge: str) -> dict:
       answer-only JSON can truncate mid-reply — the failure above, with a new
       cause. Cheap insurance: the judge emits short JSON, so the extra headroom
       is only ever drawn on when something goes wrong.
+
+    A local judge that thinks needs far more than that, and the failure is worse
+    than truncation. Ollama's OpenAI-compatible endpoint charges reasoning to the
+    same budget but does not return it, so a judge that spends the whole ceiling
+    thinking returns `finish_reason: "length"` with **zero characters** of text.
+    ragas gets nothing to parse, and its `fix_output_format` repair prompt goes to
+    the same model and does the same thing — the safety net is made of the same
+    cloth as the hole. Measured on one subset row with qwen3.6:
+
+    | max_tokens | finish_reason | output | completion tokens | parses |
+    |-----------:|---------------|-------:|------------------:|--------|
+    | 4096       | length        | 0      | 4096              | no     |
+    | 8192       | stop          | 550    | 5121              | yes    |
+
+    Hence 16384 for thinking judges: ~4900 of those tokens were reasoning, and
+    the margin has to cover the worst row, not the median one. Non-thinking
+    judges keep 4096 so every score already recorded stays reproducible.
     """
     if judge.startswith("anthropic/"):
         return {"max_tokens": 8192}
+    if any(t in judge for t in THINKING_JUDGES):
+        return {"temperature": 0.0, "max_tokens": 16384}
     return {"temperature": 0.0, "max_tokens": 4096}
 
 

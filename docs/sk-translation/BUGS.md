@@ -1,4 +1,4 @@
-<!-- translated-from: 1a8de5d -->
+<!-- translated-from: 3ce3a92 -->
 # Chyby, pasce a opravy
 
 > **Slovenský preklad.** Zdroj: [`../../BUGS.md`](../../BUGS.md) v commite
@@ -112,6 +112,49 @@ Všetky tri patche sú idempotentné a **zhodia build**, ak upstream zdroj už
 nesedí — takže nemôžu pri upgrade ticho prestať platiť.
 
 ---
+
+### A4. RAGAS hodnotí cez `/v1/completions`, ktoré Anthropic neposkytuje
+
+Inline TrustyAI provider pýta od judge-a text cez **legacy completions** API
+(`wrappers_inline.py`):
+
+```python
+request = OpenAICompletionRequestWithExtraBody(model=..., prompt=prompt.to_string())
+response = await self.inference_api.openai_completion(request)
+```
+
+Ollama servíruje oba endpointy, takže pri lokálnych judge-och je to neviditeľné.
+Keď prišiel neutrálny judge z EVALUATION-LIMITS.md §4.5, zlyhalo každé volanie:
+
+```
+LLM generation failed: Error code: 404 - {'type': 'not_found_error', ...}
+```
+
+Namerané proti `api.anthropic.com` s platným kľúčom:
+
+| Endpoint                    | Výsledok |
+|-----------------------------|---------:|
+| `POST /v1/completions`      | 404      |
+| `POST /v1/chat/completions` | 200      |
+
+Tú 404 je ľahké zle diagnostikovať, lebo **404 vráti aj zlé id modelu** —
+`{"model":"anthropic/claude-opus-5"}` dá `not_found_error: model:
+anthropic/claude-opus-5`, čo vyzerá ako chyba routovania v llama-stacku.
+Rozlišujúci detail je, že telo chyby menuje model len v prípade modelu; pri
+chýbajúcom endpointe nesie holé `"Not found"`.
+
+Opravené v `patch-ragas-chat-completions.py`: pre judge-ov, ktorých provider vie
+len chat, sa požiadavka preloží na chat completion s jednou user správou a text
+sa číta z `choice.message.content` namiesto `choice.text`.
+
+**Zámerne obmedzené len na týchto providerov.** Text a chat completions sa líšia
+vo viac než v transporte: chat aplikuje chat template modelu, takže judge vidí
+inak zarámovaný prompt a môže skórovať inak. Presmerovať existujúcich lokálnych
+judge-ov cez novú cestu by ticho znehodnotilo každé skóre už zapísané
+v EVALUATION.md, takže `ollama/*` si drží bajtovo identickú cestu. Zvyšok — že
+hostený judge je promptovaný cez chat, kým lokálni cez raw completion — je
+caveat toho krížového porovnania, nie niečo, čo by patch vedel odstrániť:
+neexistuje endpoint, na ktorom by sa dali promptovať oba druhy judge-ov rovnako.
 
 ## B. Tiché zlyhania (žiadna chyba, funkcia len chýba)
 
@@ -568,6 +611,33 @@ hovorí „toto je adresár, nie skript". Ešte horšie, ten prázdny adresár v
 absolútnu cestu.
 
 ---
+
+### E13. Nekvalifikovaný názov image sa resolvne na `localhost/`, takže rebuild nemal efekt
+
+SETUP.md stavia a taguje `docker.io/llamastack/distribution-ollama:0.2.9`, ale
+upstream compose súbor žiada **nekvalifikovaný** názov:
+
+```yaml
+image: llamastack/distribution-ollama:0.2.9
+```
+
+Podman resolvuje nekvalifikované názvy podľa svojho search listu a uprednostní
+image z **`localhost/`**, ak taký existuje — a existoval, zo staršieho buildu.
+Takže dva image-y niesli rovnaký tag s rôznymi ID, `podman build` aktualizoval
+ten `docker.io/`, a kontajner naďalej štartoval zo zastaraného `localhost/`.
+Nič nevarovalo: build prešiel, kontajner nabehol zdravý a novo pridaný provider
+jednoducho chýbal v `/v1/providers`.
+
+Diagnostikovateľné to spravilo porovnanie ID namiesto dôvery v tagy:
+
+```bash
+podman images --format '{{.Id}} {{.Repository}}:{{.Tag}}' | grep distribution-ollama
+podman inspect rag-llamastack --format '{{.Image}}'
+```
+
+Pozor, `podman-compose up -d` kontajner **nerekreuje**, keď sa zmení image za
+jeho tagom, takže aj správny tag potrebuje najprv `podman rm -f` — dva samostatné
+dôvody, prečo ten istý zastaraný kontajner prežije rebuild.
 
 ## F. Limity schopností modelov (nie chyby, ale rozbíjajú funkcie)
 

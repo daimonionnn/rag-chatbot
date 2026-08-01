@@ -1,8 +1,8 @@
-<!-- translated-from: 4017d16 -->
+<!-- translated-from: 3ce3a92 -->
 # 4 — Čo táto evaluácia **nemeria**
 
 > **Slovenský preklad.** Zdroj:
-> [`../../EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) v commite `4017d16`.
+> [`../../EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) v commite `3ce3a92`.
 > Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on. Prehľad
 > prekladov: [INDEX.md](INDEX.md).
 
@@ -187,9 +187,7 @@ neznámej veľkosti.
 
 **Náprava:** krížové hodnotenie. Oskórovať odpovede každého modelu každým
 z troch judge modelov a reportovať maticu. Ak sa poradie modelu zmení podľa
-judge-a, poradie je o judge-ovi, nie o modeli. Oskórovanie jedného modelu jedným
-judge-om tu stojí ~5 h, takže plná matica 3×3 je ~45 h — podmnožina 40 otázok to
-zlacní (~10 h) a na odhalenie efektu stačí.
+judge-a, poradie je o judge-ovi, nie o modeli.
 
 **Odteraz nosné, 2026-07-27.** Táto výhrada prestala byť teoretická vo chvíli, keď
 [EVALUATION.md §3.9](EVALUATION.md) položila na stôl poradie. gemma3 je prvá a
@@ -197,19 +195,27 @@ metrika, ktorú vyhráva najpresvedčivejšie — `factual_correctness`, +0.045 
 druhým — je skórovaná judge-om, ktorým je gemma3. Poradie aj confound ukazujú tým
 istým smerom, čo je presne prípad, pred ktorým táto sekcia varuje.
 
-Dve veci to zužujú, ale nezatvárajú. `answer_similarity` **nemá judge-a v slučke**
-(kosínusová podobnosť embeddingov) a gemma3 vedie aj tam, takže jej blízkosť
-k referencii nie je artefaktom toho, kto hodnotí. A ten náskok nie je ani
-artefaktom dĺžky: gemma3 a gemma4-no-think produkujú odpovede rovnakej mediánovej
-dĺžky (248 vs 247 znakov) a aj tak sa líšia o 0.040. Nevyriešený zostáva krok od
-„najbližšie k referencii" k „najsprávnejšie" — a `answer_similarity` je podľa §4.3
-takmer slepá voči správnosti, takže jediná metrika, ktorá by ten krok urobila, je
-tá zaťažená confoundom.
+**MEASURED, 2026-08-01, a hypotéza bola nesprávna poučným spôsobom.** Všetky tri
+modely boli preskórované na stratifikovanej podmnožine 40 riadkov judge-om
+`anthropic/claude-opus-5` — judge-om, ktorý nie je jedným zo súťažiacich, čím
+žiadny lokálny model byť nemôže. Plné čísla a metóda:
+[EVALUATION.md §3.10](EVALUATION.md).
 
-**Najlacnejšia rozhodujúca verzia:** odpovede už existujú, takže sa nič
-negeneruje nanovo — preskórovať všetky tri modely s qwen3.6 ako judge-om, ~12 h. Je
-to jeden stĺpec matice 3×3 a stačí na zodpovedanie skutočne položenej otázky:
-prežije náskok gemma3 judge-a, ktorý nie je gemma3?
+Víťaz každej metriky je pod neutrálnym judge-om nezmenený a náskok gemma3 na
+`factual_correctness` nad gemma4 sa **rozšíri** z +0.065 na +0.109. Confound teda
+bol skutočný, ale mieril opačne: gemma3 hodnotiaca samu seba svoj margin
+*podhodnocovala*, nie vyrábala. Obava, ktorú táto sekcia vzniesla, bola
+oprávnená — záver, ktorého sa obávala, nie.
+
+Čo neprežilo, je časť, o ktorú sa nikto nebál. gemma4 a qwen3.6 delilo na
+`factual_correctness` +0.064 pod gemma3 a **+0.004** pod neutrálnym judge-om —
+nerozoznateľné, na šestine rozlíšenia vzorky. **„gemma3 prvá" je zistenie
+o modeloch; „gemma4 druhá, qwen3.6 tretia" bolo zistenie o judge-ovi.**
+
+Dve veci to nezatvára. Neutrálny judge je promptovaný cez chat completions, kým
+lokálni používajú raw text completions (BUGS.md A4), takže „iný judge" a „iné
+zarámovanie" sú navzájom confoundnuté. A jeden neutrálny judge je jeden stĺpec,
+nie matica 3×3 — tvrdenie znie, že náskok gemma3 prežije *tohto* judge-a.
 
 ---
 
@@ -284,9 +290,10 @@ nájdený rozdiel medzi modelmi.
    produkčný kompromis, ktorý súčasná tabuľka úplne skrýva.
 5. **Reportovať retrieval metriky raz**, nie per model (§4.1). Odstráni zavádzajúci
    stĺpec — pri dvoch z troch modelov potvrdene bit-presne rovnaký.
-6. **Krížové hodnotenie na podmnožine 40 otázok** (§4.5). gemma3 vedie na dvoch zo
-   štyroch skutočných metrík presne tým odstupom, aký by mohla vyrobiť
-   sebazvýhodňujúca zaujatosť.
+6. ~~**Krížové hodnotenie na podmnožine 40 otázok** (§4.5).~~ **Hotové,
+   2026-08-01** — náskok gemma3 obstál a narástol; poradie gemma4/qwen3.6
+   neobstálo. Zostáva doplniť ďalšie dva stĺpce matice, ktoré by povedali, či
+   prvé miesto prehodí *ktorýkoľvek* judge, nielen tento jeden.
 7. **Rozšíriť testovaciu sadu**: parafrázy, otázky cez viac dokumentov,
    neodpovedateľné otázky (§4.2). Najväčšia zmena a tá, ktorá by z benchmarku
    urobila meranie uvažovania namiesto kopírovania.
@@ -314,8 +321,9 @@ nájdený rozdiel medzi modelmi.
   navyše, je v §4.10.3.
 - **Vyhráva gemma3 o vlások?** Áno, na dvoch zo štyroch skutočných metrík, o 3–5
   bodov — dosť málo na to, aby obava o sebahodnotenie z §4.5 bola živá, nie
-  poznámka pod čiarou. Ďalej sa to tu netestovalo (vyžadovalo by to krížové
-  hodnotenie, teda nápravu navrhnutú v §4.5).
+  poznámka pod čiarou. Odvtedy krížovo overené (§4.5, 2026-08-01): výhra je
+  skutočná a pod neutrálnym judge-om margin rastie. Skutočná nebola gemma4
+  na druhom mieste.
 
 Kompletné čísla: [EVALUATION.md §3.7](EVALUATION.md).
 

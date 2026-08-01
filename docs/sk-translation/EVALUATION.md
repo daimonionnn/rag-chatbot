@@ -1,8 +1,8 @@
-<!-- translated-from: 4017d16 -->
+<!-- translated-from: 3ce3a92 -->
 # 3 — RAGAS evaluácia
 
 > **Slovenský preklad.** Zdroj: [`../../EVALUATION.md`](../../EVALUATION.md)
-> v commite `4017d16`. Anglický originál je zdroj pravdy — ak sa rozchádzajú,
+> v commite `3ce3a92`. Anglický originál je zdroj pravdy — ak sa rozchádzajú,
 > platí on. Prehľad prekladov: [INDEX.md](INDEX.md).
 
 Adaptované z dvoch vzájomne sa dopĺňajúcich upstream repozitárov:
@@ -364,9 +364,9 @@ slepú voči správnosti (0.9943 zápornej verzii faktu), takže „najbližšie
 k referencii" nie je „najsprávnejšie" — a metrika, ktorá by ten krok urobila, je
 práve tá zaťažená confoundom.
 
-**Rozhodnúť to stojí jeden ďalší beh:** preskórovať existujúce odpovede všetkých
-modelov nezávislým judge-om (qwen3.6). Negeneruje sa nič nanovo, ~12 h. Ak náskok
-gemma3 prežije judge-a, ktorý nie je gemma3, potom je to poradie o modeloch.
+**Rozhodnuté v §3.10** preskórovaním existujúcich odpovedí každého modelu
+judge-om, ktorý nie je jedným zo súťažiacich. Prvé miesto gemma3 obstálo; druhé
+a tretie nie.
 
 ### Praktické odporúčanie
 
@@ -378,3 +378,137 @@ gemma3 prežije judge-a, ktorý nie je gemma3, potom je to poradie o modeloch.
   namiesto 0.8008.
 - **Thinking nezapínať ani na jednom.** Na gemma4 nekúpi nič merateľné za 3,5×
   dlhší čas generovania a na qwen3.6 aktívne stojí faktickú presnosť.
+
+---
+
+## 3.10 Cross-judged: ktoré časti poradia sú o modeloch
+
+§3.9 zoradila päť konfigurácií a [EVALUATION-LIMITS.md §4.5](EVALUATION-LIMITS.md)
+namietla, že judge bol jedným zo súťažiacich: gemma3 skórovala každý beh vrátane
+vlastného a metrika, ktorú vyhráva najpresvedčivejšie — `factual_correctness` —
+je skórovaná judge-om. Táto sekcia preskóruje tie isté odpovede judge-om, ktorý
+súťažiacim nie je nijako, `anthropic/claude-opus-5`, a hlási, čo sa pohlo.
+
+Nič sa negenerovalo nanovo. Uložené odpovede a ich retrieved contexts sa čítajú
+doslovne, takže **judge je jediné, čo sa oproti §3.7 líši**. Beh 2026-08-01,
+40 riadkov na model, ~62 min a ~$11 na model, nula zlyhaných volaní judge-a.
+
+### Podmnožina a prečo to nie je 40 náhodných riadkov
+
+§4.10.2 odmerala, že 46 riadkov s duplicitným textom otázky (dvojice MINI/MAXI)
+skóruje na `factual_correctness` nižšie než 136 unikátnych, a to pri každom
+modeli. Podmnožina, ktorá by ich vzorkovala v inom pomere, by nebola porovnateľná
+s plným behom, takže `rag-eval/make_subset.py` ten podiel zachováva — 25,0 %
+oproti 25,3 % plného setu — a berie **iba celé dvojice**, keďže efekt z §4.10.2
+spočíva v tom, že *tá istá odpoveď* skóruje 1.0 na jednom indexe dvojice a 0.0 na
+druhom. Obaja judge-ovia skórujú tých istých 40 indexov a uložené 182-riadkové
+výsledky sa pred akýmkoľvek porovnaním nareže na tie isté indexy, takže zmena
+judge-a nie je nikdy confoundnutá so zmenou vzorky.
+
+### Výsledky
+
+Párovo cez riadky, ktoré oskórovali obaja judge-ovia (`n` sa líši podľa metriky,
+lebo ktorýkoľvek judge môže riadok neoskórovať — v praxi to spravila len gemma3,
+na 2 riadkoch `faithfulness` a 1 riadku `factual_correctness`; claude-opus-5
+vrátil skóre pre všetkých 40 riadkov všetkých 6 metrík u všetkých 3 modelov).
+`context_precision` a `context_recall` sú tu vynechané a rozobrané nižšie; nikdy
+nevidia odpoveď, takže modely zoradiť nevedia.
+
+| Metrika             | gemma3          | gemma4     | qwen3.6    | gemma3                 | gemma4     | qwen3.6    | n   |
+|---------------------|----------------:|-----------:|-----------:|-----------------------:|-----------:|-----------:|----:|
+|                     | *judge: gemma3* |            |            | *judge: claude-opus-5* |            |            |     |
+| faithfulness        | 0.9794          | **0.9846** | 0.9598     | 0.9971                 | **1.0000** | 0.9732     | 38  |
+| answer_relevancy    | 0.5896          | 0.6498     | **0.6791** | 0.7173                 | 0.7920     | **0.8073** | 40  |
+| answer_similarity   | **0.9564**      | 0.9160     | 0.8759     | **0.9564**             | 0.9160     | 0.8759     | 40  |
+| factual_correctness | **0.9023**      | 0.8369     | 0.7733     | **0.8810**             | 0.7718     | 0.7679     | 39  |
+
+**Víťaz každej metriky je nezmenený.** Všetky štyri vyberajú pod oboma judge-mi
+ten istý model.
+
+### Prvé miesto gemma3 nie je artefakt sebahodnotenia
+
+Obava znela konkrétne tak, že gemma3 nafukuje vlastnú `factual_correctness`.
+Nenafukuje — presnejšie, čokoľvek robí svojmu skóre, robí gemma4 viac:
+
+| `factual_correctness` | judge gemma3 | judge claude-opus-5 |
+|-----------------------|-------------:|--------------------:|
+| gemma3 − gemma4       | +0.0654      | **+0.1092**         |
+| gemma3 − qwen3.6      | +0.1290      | +0.1131             |
+
+Náskok nad gemma4 sa pod neutrálnym judge-om takmer zdvojnásobí a náskok nad
+qwen3.6 sa udrží (zmena −0.016 je vnútri šumového pásma nižšie). Hypotéza z §4.5
+mierila správnym smerom na nesprávny cieľ: confound bol skutočný, ale margin
+gemma3 **podhodnocoval**, nie vyrábal.
+
+### Čo neprežilo: druhé miesto
+
+| `factual_correctness` | judge gemma3 | judge claude-opus-5 |
+|-----------------------|-------------:|--------------------:|
+| gemma4 − qwen3.6      | +0.0636      | **+0.0039**         |
+
+Pod neutrálnym judge-om sú tieto dva nerozoznateľné — 0.0039 je šestina
+rozlíšenia tejto vzorky. Tých šesť bodov, ktoré ich delilo, bol podstatne názor
+gemma3, nie vlastnosť odpovedí. gemma4 si drží `faithfulness`, qwen3.6
+`answer_relevancy`, a metrika, ktorá to mala rozseknúť, to neseká.
+
+**Poradie sa teda delí na dve časti.** „gemma3 prvá" je zistenie o modeloch.
+„gemma4 druhá, qwen3.6 tretia" bolo zistenie o judge-ovi.
+
+### Úrovne metrík závisia od judge-a, poradia nie
+
+`answer_relevancy` stúpla o +0.128 až +0.142 **všetkým trom** modelom pri
+zachovaní ich poradia. Jej absolútna hodnota preto sama o sebe nehovorí takmer
+nič — 0.72 od jedného judge-a a 0.59 od druhého popisujú tie isté odpovede. Čítať
+ju treba len ako porovnanie v rámci jedného judge-a. V tabuľke §3.7 to nie je
+vidieť nikde, tá číslo prezentuje, akoby bolo vlastnosťou modelu.
+
+`answer_similarity` sa naprieč judge-mi reprodukuje na štyri desatinné miesta,
+ako musí: je to kosínusová podobnosť embeddingov bez judge-a v slučke. To, že
+vyšla identicky, je kontrola, ktorá dáva zvyšku tabuľky váhu — potvrdzuje, že
+obaja judge-ovia videli tie isté riadky, narezané rovnako.
+
+### Druhé šumové pásmo, opäť zadarmo
+
+`context_precision` a `context_recall` konzumujú referenciu, kontexty a otázku —
+nikdy odpoveď. Naprieč tromi súbormi modelov sú tie vstupy **bajtovo identické**,
+takže tri skórovania by mali vrátiť po jednej hodnote. Vracajú dve, na oboch
+metrikách. §3.8 presne týmto odvodila svoje pásmo 0.006:
+
+| Skórované na   | context_precision | context_recall |
+|----------------|------------------:|---------------:|
+| súbore gemma3  | 0.8983            | **0.9679**     |
+| súbore gemma4  | 0.8983            | 0.9929         |
+| súbore qwen3.6 | **0.8995**        | 0.9929         |
+
+V oboch prípadoch sa preklopil presne **jeden riadok zo 40** —
+`context_precision` na súbore qwen3.6, `context_recall` na súbore gemma3. gemma3
+ako judge sa nespráva lepšie: na `context_precision` rozdelila 0.9914 / 0.9815
+medzi dva súbory, kým `context_recall` zreprodukovala presne.
+
+To určuje rozlíšenie tejto vzorky: jeden riadok je 0.025, takže žiadny rozdiel
+pod touto hodnotou nie je interpretovateľný, a pásmo je nutne širšie než 0.006
+z §3.8, lebo vzorka je štvrtinová.
+
+Aplikované: pokles vlastnej `factual_correctness` gemma3 o −0.0202 je *pod*
+pásmom a sám o sebe neznamená nič; −0.0651 gemma4 a rozšírenie rozdielu
+gemma3–gemma4 o +0.0438 sú nad ním.
+
+Zároveň to ukazuje, že retrieval metriky nie sú tie čisté konštanty konfigurácie,
+aké predpokladala §4.1. Nad rámec vlastnej nestability každého judge-a sa tí dvaja
+navzájom líšia o −0.093 na `context_precision` pri identickom retrievale. Merajú
+retrieval *aj* judge-a, a oprava navrhnutá v §4.1 — vykázať ich raz ako vlastnosť
+retrieval konfigurácie — platí len v rámci jedného judge-a.
+
+### Čo tento beh oddeliť nevie
+
+Neutrálny judge sa dosahuje cez chat completions, kým lokálni judge-ovia
+používajú raw text-completions endpoint, ktorý Anthropic neposkytuje (BUGS.md
+A4). Chat aplikuje chat template modelu, takže „iný judge" a „iné zarámovanie
+promptu" sa tu pohli spolu a žiadnu časť rozdielov nemožno pripísať jednému skôr
+než druhému. Presmerovať cez chat aj lokálnych judge-ov by ich urobilo
+porovnateľnými navzájom, ale znehodnotilo by každé číslo v §3.7, takže confound
+je zdokumentovaný, nie odstránený.
+
+Dve ďalšie obmedzenia: 40 riadkov namiesto 182, s dôsledkom na rozlíšenie vyššie;
+a jeden judge namiesto plnej matice 3×3, takže toto hovorí, že náskok gemma3
+prežije *tohto* neutrálneho judge-a, nie každého.

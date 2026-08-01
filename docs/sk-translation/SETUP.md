@@ -1,4 +1,4 @@
-<!-- translated-from: 7f56dd2 -->
+<!-- translated-from: 3ce3a92 -->
 # 1 — Lokálne spustiteľný setup
 
 > **Slovenský preklad.** Zdroj: [`../../SETUP.md`](../../SETUP.md) v commite
@@ -173,6 +173,21 @@ nedotknutý:
 ```bash
 podman build -f llamastack-local-image/Containerfile-0.6.0 \
   -t docker.io/llamastack/distribution-ollama:0.2.9 llamastack-local-image
+podman tag docker.io/llamastack/distribution-ollama:0.2.9 \
+           localhost/llamastack/distribution-ollama:0.2.9
+podman rm -f rag-llamastack   # samotné up -d bežiaci kontajner nevymení
+```
+
+Druhý a tretí riadok nie sú voliteľné a ich vynechanie zlyhá **ticho** — build
+prejde, kontajner nabehne zdravý a beží starý kód. Compose súbor žiada
+nekvalifikovaný `llamastack/distribution-ollama:0.2.9`, ktorý podman resolvuje
+prednostne na `localhost/`, nie na `docker.io/`; a `podman-compose up -d`
+kontajner nerekreuje, keď sa zmení image za jeho tagom. Pozri
+[BUGS.md](BUGS.md) E13. Overiť porovnaním ID, nie tagov:
+
+```bash
+podman images --format '{{.Id}} {{.Repository}}:{{.Tag}}' | grep distribution-ollama
+podman inspect rag-llamastack --format '{{.Image}}'
 ```
 
 - **`Containerfile-0.6.0`** — python:3.12-slim, závislosti providerov a
@@ -199,6 +214,41 @@ takže model sa mení cez
 [`compose-model-override.yml`](../../compose-model-override.yml), nie jeho
 úpravou. Ten súbor nastavuje aj `EMBEDDING_MODEL`, čo je to, čo aktivuje RAGAS
 provider.
+
+### Hostený judge (voliteľný, štandardne vypnutý)
+
+Každý lokálny model je zároveň súťažiacim v benchmarku, takže žiadny z nich
+nevie odpovedať, či náskok jedného modelu prežije judge-a, ktorým nie je on sám
+([EVALUATION-LIMITS.md](EVALUATION-LIMITS.md) §4.5). Neutrálneho dodáva provider
+`remote::anthropic`. Je to **iba** judge: nikdy negeneruje odpovede a v model
+pickeri UI sa neobjaví inak než ako jediné id nižšie.
+
+Kľúč patrí do netrackovaného `.env.local`, ktorý sourcuje `start-stack.sh` — bez
+úvodzoviek a bez `export`, keďže exportovanie robí `set -a`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-api03-...
+```
+
+Potom je to argument `JUDGE`, nič iné sa nemení:
+
+```bash
+.client06-venv/bin/python rag-eval/score_ragas.py EVAL_DATA.json anthropic/claude-opus-5
+```
+
+**Bez nastaveného kľúča sa provider preskočí úplne** — `provider_id` je
+`${env.ANTHROPIC_API_KEY:+anthropic}`, takže sa vyhodnotí na prázdny reťazec a
+stack beží plne offline presne ako predtým, rovnakým gating trikom, aký používa
+`EMBEDDING_MODEL` pre RAGAS provider. Ďalšie dve poznámky: `allowed_models`
+pripína ten jeden judge model, takže ostatné modely účtu sa nedajú omylom vybrať
+a naúčtovať; a judge sa dosahuje cez chat completions namiesto raw completions
+endpointu, ktorý používajú lokálni judge-ovia, čo je skutočný caveat krížových
+porovnaní, nie implementačný detail — pozri [BUGS.md](BUGS.md) A4.
+
+Nameraná cena, 40 riadkov × 6 metrík, `claude-opus-5`: **~$11 na model**, ~62 min
+wall clock. To nie je pomalšie než lokálny judge (§3.4 uvádza 15–17 s na
+row-metric), lebo judge nesúperí o GPU s embedding modelom — rezidentný zostáva
+len 13,3 GiB embedding model, nie 54 GB LLM.
 
 ---
 

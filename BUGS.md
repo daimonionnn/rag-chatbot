@@ -108,6 +108,49 @@ longer matches, so they cannot silently lapse across an upgrade.
 
 ---
 
+### A4. RAGAS judges via `/v1/completions`, which Anthropic does not serve
+
+The inline TrustyAI provider asks the judge for text through the **legacy
+completions** API (`wrappers_inline.py`):
+
+```python
+request = OpenAICompletionRequestWithExtraBody(model=..., prompt=prompt.to_string())
+response = await self.inference_api.openai_completion(request)
+```
+
+Ollama serves both endpoints, so this is invisible for every local judge. When
+EVALUATION-LIMITS.md §4.5's neutral judge arrived, every call failed:
+
+```
+LLM generation failed: Error code: 404 - {'type': 'not_found_error', ...}
+```
+
+Measured against `api.anthropic.com` with a valid key:
+
+| Endpoint                    | Result |
+|-----------------------------|-------:|
+| `POST /v1/completions`      | 404    |
+| `POST /v1/chat/completions` | 200    |
+
+The 404 is easy to misdiagnose, because a **wrong model id returns 404 too** —
+`{"model":"anthropic/claude-opus-5"}` gives `not_found_error: model:
+anthropic/claude-opus-5`, which reads like a routing bug in llama-stack. The
+distinguishing detail is that the error body names the model only in the
+model case; the endpoint case carries a bare `"Not found"`.
+
+Fixed by `patch-ragas-chat-completions.py`: for judges whose provider serves only
+chat, the request is translated to a single-user-message chat completion and the
+text is read from `choice.message.content` instead of `choice.text`.
+
+**Deliberately scoped to those providers.** Chat applies the model's chat
+template, so the judge sees a differently framed prompt than raw completion does.
+Routing the local judges through the new path would silently invalidate every
+score already in EVALUATION.md, so `ollama/*` keeps its byte-identical path. The
+residue — the hosted judge is prompted through chat, the local ones through raw
+completion — is a caveat of the cross-judge comparison rather than something the
+patch can remove: no endpoint exists on which both kinds of judge can be prompted
+identically.
+
 ## B. Silent failures (no error, feature simply absent)
 
 ### B1. fastText + NumPy 2 disables the language rail entirely
@@ -565,6 +608,33 @@ directory was created *inside the pinned, gitignored `RAG/` clone*.
 **Fix:** use an absolute path for bind-mount sources declared in an override file.
 
 ---
+
+### E13. An unqualified image name resolves to `localhost/`, so the rebuild had no effect
+
+SETUP.md builds and tags `docker.io/llamastack/distribution-ollama:0.2.9`, but
+the upstream compose file asks for the **unqualified** name:
+
+```yaml
+image: llamastack/distribution-ollama:0.2.9
+```
+
+Podman resolves unqualified names against its search list and prefers a
+**`localhost/`** image when one exists — and one did, from an earlier build. So
+two images carried the same tag with different IDs, `podman build` updated the
+`docker.io/` one, and the container kept starting from the stale `localhost/`
+one. Nothing warned: the build succeeded, the container started healthy, and the
+newly added provider was simply absent from `/v1/providers`.
+
+What made it diagnosable was comparing IDs rather than trusting the tag:
+
+```bash
+podman images --format '{{.Id}} {{.Repository}}:{{.Tag}}' | grep distribution-ollama
+podman inspect rag-llamastack --format '{{.Image}}'
+```
+
+Note `podman-compose up -d` does **not** recreate a container when the image
+behind its tag changes, so even the correct tag needs `podman rm -f` first — two
+separate reasons the same stale container survives a rebuild.
 
 ## F. Model capability limits (not bugs, but they break features)
 

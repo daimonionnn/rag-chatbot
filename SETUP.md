@@ -165,6 +165,21 @@ name the upstream compose expects, so `podman-compose.yml` stays untouched:
 ```bash
 podman build -f llamastack-local-image/Containerfile-0.6.0 \
   -t docker.io/llamastack/distribution-ollama:0.2.9 llamastack-local-image
+podman tag docker.io/llamastack/distribution-ollama:0.2.9 \
+           localhost/llamastack/distribution-ollama:0.2.9
+podman rm -f rag-llamastack   # up -d alone will not replace a running container
+```
+
+The second and third lines are not optional, and skipping them fails **silently**
+— the build succeeds, the container starts healthy, and it runs the old code.
+The compose file asks for the unqualified `llamastack/distribution-ollama:0.2.9`,
+which podman resolves to `localhost/` in preference to `docker.io/`; and
+`podman-compose up -d` does not recreate a container when the image behind its
+tag changes. See [BUGS.md](BUGS.md) E13. Verify by comparing IDs, not tags:
+
+```bash
+podman images --format '{{.Id}} {{.Repository}}:{{.Tag}}' | grep distribution-ollama
+podman inspect rag-llamastack --format '{{.Image}}'
 ```
 
 - **`Containerfile-0.6.0`** — python:3.12-slim, the provider dependencies, and
@@ -176,8 +191,9 @@ podman build -f llamastack-local-image/Containerfile-0.6.0 \
   files + pypdf, meta-reference agents (OpenAI responses/conversations),
   llama-guard safety, the rag/websearch tool runtime, and the TrustyAI RAGAS
   eval provider. The scoring/post_training/batches training stack is dropped.
-- **two build-time patches** to installed packages, both explained in
-  [BUGS.md](BUGS.md): non-latin-1 filenames, and the RAGAS embeddings event loop.
+- **four build-time patches** to installed packages, all explained in
+  [BUGS.md](BUGS.md): non-latin-1 filenames, the RAGAS embeddings event loop,
+  the RAGAS ModeMetric key, and the RAGAS chat-completions fallback.
 
 The older `Containerfile` / `run.yaml` in that folder are the abandoned 0.2.9
 attempt, kept for reference.
@@ -188,6 +204,41 @@ The upstream compose hardcodes `INFERENCE_MODEL: llama3.2:3b-instruct-fp16`, so
 the model is changed through [`compose-model-override.yml`](compose-model-override.yml)
 rather than by editing it. That file also sets `EMBEDDING_MODEL`, which is what
 activates the RAGAS provider.
+
+### The hosted judge (optional, off by default)
+
+Every local model is also a contestant in the benchmark, so none of them can
+answer whether one model's lead survives a judge that is not itself
+([EVALUATION-LIMITS.md](EVALUATION-LIMITS.md) §4.5). A `remote::anthropic`
+provider supplies a neutral one. It is **only** a judge: it never generates
+answers and never appears in the UI's model picker beyond the single id below.
+
+Set the key in the untracked `.env.local` that `start-stack.sh` sources — no
+quotes, no `export`, since `set -a` does the exporting:
+
+```
+ANTHROPIC_API_KEY=sk-ant-api03-...
+```
+
+Then it is the `JUDGE` argument, nothing else changes:
+
+```bash
+.client06-venv/bin/python rag-eval/score_ragas.py EVAL_DATA.json anthropic/claude-opus-5
+```
+
+**With the key unset the provider is skipped entirely** — `provider_id` is
+`${env.ANTHROPIC_API_KEY:+anthropic}`, so it resolves to empty and the stack runs
+fully offline exactly as before, the same gating trick `EMBEDDING_MODEL` uses for
+the RAGAS provider. Two further notes: `allowed_models` pins the one judge model,
+so the account's other models cannot be picked by accident and billed; and the
+judge is reached over chat completions rather than the raw completions endpoint
+the local judges use, which is a real caveat for cross-judge comparisons rather
+than an implementation detail — see [BUGS.md](BUGS.md) A4.
+
+Measured cost, 40 rows x 6 metrics, `claude-opus-5`: **~$11 per model**, ~62 min
+wall clock. That is no slower than a local judge (§3.4's 15-17 s per row-metric),
+because the judge is not competing with the embedding model for the GPU — only
+the 13.3 GiB embedding model stays resident, not the 54 GB LLM.
 
 ---
 

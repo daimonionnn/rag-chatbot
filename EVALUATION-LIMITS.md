@@ -177,9 +177,7 @@ size.
 
 **Fix:** cross-judge. Score every model's answers with each of the three judges
 and report the matrix. If a model's rank changes with the judge, the ranking is
-about the judge, not the model. Scoring one model with one judge costs ~5 h here,
-so a full 3×3 matrix is ~45 h — a 40-question subset makes it affordable
-(~10 h) and is enough to detect the effect.
+about the judge, not the model.
 
 **Now load-bearing, 2026-07-27.** This stopped being a theoretical caveat once
 [EVALUATION.md §3.9](EVALUATION.md) put a ranking on the table. gemma3 comes first,
@@ -187,19 +185,28 @@ and the metric it wins most decisively — `factual_correctness`, +0.045 over th
 next best — is judge-scored, by gemma3. The ranking and the confound point the
 same way, which is exactly the case this section warns about.
 
-Two things narrow it without closing it. `answer_similarity` has **no judge in the
-loop** (cosine similarity between embeddings) and gemma3 leads there too, so its
-closeness to the reference is not an artefact of who is judging. And that lead is
-not a length artefact either: gemma3 and gemma4-no-think produce answers of the
-same median length (248 vs 247 chars) and still differ by 0.040. What remains
-unresolved is the step from "closest to the reference" to "most correct" — and
-`answer_similarity`, per §4.3, is nearly blind to correctness, so the only metric
-that could make that step is the confounded one.
+**MEASURED, 2026-08-01, and the hypothesis was wrong in an instructive way.**
+All three models were re-scored on a 40-row stratified subset by
+`anthropic/claude-opus-5` — a judge that is not one of the contestants, which no
+local model can be. Full numbers and method: [EVALUATION.md §3.10](EVALUATION.md).
 
-**Cheapest decisive version:** the answers already exist, so no regeneration is
-needed — re-score all three models with qwen3.6 as judge, ~12 h. That is a single
-column of the 3×3 matrix and enough to answer the question actually being asked:
-does gemma3's lead survive a judge that is not gemma3?
+Every metric's winner is unchanged under the neutral judge, and gemma3's
+`factual_correctness` lead over gemma4 **widens** from +0.065 to +0.109. So the
+confound was real but pointed the other way: gemma3 judging itself was
+*understating* its margin, not manufacturing it. The concern this section raised
+was legitimate and the conclusion it feared was not.
+
+What did not survive is the part nobody was worried about. gemma4 and qwen3.6
+were separated by +0.064 on `factual_correctness` under gemma3 and by **+0.004**
+under a neutral judge — indistinguishable, at a sixth of the sample's resolution.
+**"gemma3 first" is a finding about the models; "gemma4 second, qwen3.6 third"
+was a finding about the judge.**
+
+Two things this does not close. The neutral judge is prompted over chat
+completions while the local judges use raw text completions (BUGS.md A4), so
+"different judge" and "different framing" are confounded with each other. And one
+neutral judge is one column, not the 3×3 matrix — the claim is that gemma3's lead
+survives *this* judge.
 
 ---
 
@@ -274,8 +281,10 @@ difference found.
    production trade-off the current table hides entirely.
 5. **Report retrieval metrics once**, not per model (§4.1). Removes a
    misleading column — confirmed bit-identical between two of the three models.
-6. **Cross-judge on a 40-question subset** (§4.5). gemma3 leads on two of four
-   real metrics by exactly the margin self-judging bias could produce.
+6. ~~**Cross-judge on a 40-question subset** (§4.5).~~ **Done, 2026-08-01** —
+   gemma3's lead survived and grew; the gemma4/qwen3.6 ordering did not survive.
+   The remaining work is the other two columns of the matrix, which would say
+   whether *any* judge reorders the top place rather than just this one.
 7. **Extend the test set**: paraphrases, multi-document questions, unanswerable
    questions (§4.2). The biggest change, and the one that would make the
    benchmark measure reasoning rather than copying.
@@ -301,8 +310,9 @@ difference found.
   generations (182 × 3 models). See §4.10.3 for what their extra generation time
   means instead.
 - **Does gemma3 win narrowly?** Yes, on two of four real metrics, by 3–5 points —
-  small enough that §4.5's self-judging concern is live, not a footnote. It was
-  not tested further here (would need cross-judging, §4.5's proposed fix).
+  small enough that §4.5's self-judging concern is live, not a footnote. Since
+  cross-judged (§4.5, 2026-08-01): the win is real and the margin grows under a
+  neutral judge. What turned out not to be real was gemma4's second place.
 
 Full numbers: [EVALUATION.md §3.7](EVALUATION.md).
 

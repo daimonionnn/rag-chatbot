@@ -363,9 +363,9 @@ as nearly blind to correctness (0.9943 for a negated fact), so "closest to the
 reference" is not "most correct", and the metric that would settle it is the
 confounded one.
 
-**Settling it costs one more run:** re-score every model's existing answers with an
-independent judge (qwen3.6). No regeneration needed, ~12 h. If gemma3's lead
-survives a judge that is not gemma3, the ranking is about the models.
+**Settled in §3.10** by re-scoring every model's existing answers with a judge
+that is not one of the contestants. gemma3's first place survives; the second and
+third places do not.
 
 ### Practical recommendation
 
@@ -376,3 +376,139 @@ survives a judge that is not gemma3, the ranking is about the models.
   five at 11 min, and `factual_correctness` 0.8351 rather than 0.8008.
 - **Do not enable thinking on either model.** It buys nothing measurable on gemma4
   for 3.5× the generation time, and on qwen3.6 it actively costs factual accuracy.
+
+---
+
+## 3.10 Cross-judged: which parts of the ranking are about the models
+
+§3.9 ranked five configurations, and [EVALUATION-LIMITS.md §4.5](EVALUATION-LIMITS.md)
+objected that the judge was one of the contestants: gemma3 scored every run,
+including its own, and the metric it won most decisively — `factual_correctness`
+— is judge-scored. This section re-scores the same answers with a judge that is
+in no way a contestant, `anthropic/claude-opus-5`, and reports what moved.
+
+Nothing was regenerated. The stored answers and their retrieved contexts are read
+verbatim, so **the judge is the only thing that differs** from §3.7. Run
+2026-08-01, 40 rows per model, ~62 min and ~$11 per model, zero failed judge
+calls.
+
+### The subset, and why it is not 40 random rows
+
+§4.10.2 measured that the 46 rows whose question text is duplicated (the MINI /
+MAXI pairs) score lower on `factual_correctness` than the 136 unique ones, for
+every model. A subset that sampled them at a different rate would not be
+comparable to the full run, so `rag-eval/make_subset.py` preserves the
+proportion — 25.0 % against the full set's 25.3 % — and takes **whole pairs
+only**, since §4.10.2's effect is that the *same answer* scores 1.0 at one index
+of a pair and 0.0 at the other. Both judges score the same 40 indices, and the
+stored 182-row results are sliced to those indices before any comparison, so
+changing the judge is never confounded with changing the sample.
+
+### Results
+
+Paired over rows both judges scored (`n` varies by metric because either judge
+can fail to score a row — in practice only gemma3 did, on 2 rows of
+`faithfulness` and 1 of `factual_correctness`; claude-opus-5 returned a score for
+all 40 rows of all 6 metrics on all 3 models). `context_precision` and `context_recall` are omitted
+here and discussed below; they never see the answer and so cannot rank models.
+
+| Metric              | gemma3          | gemma4     | qwen3.6    | gemma3                 | gemma4     | qwen3.6    | n   |
+|---------------------|----------------:|-----------:|-----------:|-----------------------:|-----------:|-----------:|----:|
+|                     | *judge: gemma3* |            |            | *judge: claude-opus-5* |            |            |     |
+| faithfulness        | 0.9794          | **0.9846** | 0.9598     | 0.9971                 | **1.0000** | 0.9732     | 38  |
+| answer_relevancy    | 0.5896          | 0.6498     | **0.6791** | 0.7173                 | 0.7920     | **0.8073** | 40  |
+| answer_similarity   | **0.9564**      | 0.9160     | 0.8759     | **0.9564**             | 0.9160     | 0.8759     | 40  |
+| factual_correctness | **0.9023**      | 0.8369     | 0.7733     | **0.8810**             | 0.7718     | 0.7679     | 39  |
+
+**Every metric's winner is unchanged.** All four pick the same model under both
+judges.
+
+### gemma3's first place is not an artefact of self-judging
+
+The concern was specifically that gemma3 inflates its own `factual_correctness`.
+It does not — or rather, whatever it does to its own score it does more to
+gemma4's:
+
+| `factual_correctness` | judge gemma3 | judge claude-opus-5 |
+|-----------------------|-------------:|--------------------:|
+| gemma3 − gemma4       | +0.0654      | **+0.1092**         |
+| gemma3 − qwen3.6      | +0.1290      | +0.1131             |
+
+The lead over gemma4 nearly doubles under a neutral judge and the lead over
+qwen3.6 holds (the −0.016 change is inside the noise floor below). §4.5's
+hypothesis pointed the right way at the wrong target: the confound was real, but
+it was *understating* gemma3's margin, not manufacturing it.
+
+### What does not survive: second place
+
+| `factual_correctness` | judge gemma3 | judge claude-opus-5 |
+|-----------------------|-------------:|--------------------:|
+| gemma4 − qwen3.6      | +0.0636      | **+0.0039**         |
+
+Under a neutral judge these two are indistinguishable — 0.0039 is a sixth of this
+sample's resolution. The six points that separated them were substantially
+gemma3's opinion rather than a property of the answers. gemma4 keeps
+`faithfulness` and qwen3.6 keeps `answer_relevancy`, and the metric that was
+supposed to break the tie does not break it.
+
+**So the ranking splits in two.** "gemma3 first" is a finding about the models.
+"gemma4 second, qwen3.6 third" was a finding about the judge.
+
+### Metric levels are judge-dependent; rankings are not
+
+`answer_relevancy` rose by +0.128 to +0.142 for **all three** models while
+preserving their order. Its absolute value therefore says almost nothing on its
+own — a 0.72 from one judge and a 0.59 from another describe the same answers.
+Read it only as a within-judge comparison. This is not visible anywhere in §3.7's
+table, which presents the figure as if it were a property of the model.
+
+`answer_similarity` reproduces to four decimals across judges, as it must: it is
+cosine similarity between embeddings with no judge in the loop. That it came out
+identical is the control that gives the rest of the table its weight — it
+confirms both judges saw the same rows, sliced the same way.
+
+### A second noise floor, again for free
+
+`context_precision` and `context_recall` consume reference, contexts and question
+— never the answer. Across the three model files those inputs are
+**byte-identical**, so three scorings should return one value each. They return
+two, on both metrics. §3.8 used exactly this to derive its 0.006 floor:
+
+| Scored on      | context_precision | context_recall |
+|----------------|------------------:|---------------:|
+| gemma3's file  | 0.8983            | **0.9679**     |
+| gemma4's file  | 0.8983            | 0.9929         |
+| qwen3.6's file | **0.8995**        | 0.9929         |
+
+In each case exactly **one row out of 40** flipped — `context_precision` on the
+qwen3.6 file, `context_recall` on the gemma3 file. gemma3-as-judge is no better
+behaved: it split 0.9914 / 0.9815 on `context_precision` between two files while
+reproducing `context_recall` exactly.
+
+That sets this sample's resolution: one row is 0.025, so no difference below that
+is interpretable, and the floor is necessarily wider than §3.8's 0.006 because
+the sample is a quarter the size.
+
+Applying it: gemma3's own `factual_correctness` drop of −0.0202 is *below* the
+floor and means nothing on its own; gemma4's −0.0651 and the +0.0438 widening of
+the gemma3–gemma4 gap are above it.
+
+It also shows the retrieval metrics are not the clean per-configuration constants
+§4.1 assumed. Beyond each judge's own instability above, the two judges disagree
+with each other by −0.093 on `context_precision` for identical retrieval. They
+measure retrieval *and* judge, and §4.1's fix — report them once, as a property
+of the retrieval configuration — is only valid within a single judge.
+
+### What this run cannot separate
+
+The neutral judge is reached over chat completions, while the local judges use
+the raw text-completions endpoint that Anthropic does not serve (BUGS.md A4).
+Chat applies the model's chat template, so "different judge" and "different
+prompt framing" moved together here and no part of the deltas can be attributed
+to one rather than the other. Routing the local judges through chat as well would
+have made them comparable to each other but invalidated every number in §3.7, so
+the confound is documented rather than removed.
+
+Two further limits: 40 rows rather than 182, with the resolution consequence
+above; and one judge rather than a full 3×3 matrix, so this says gemma3's lead
+survives *this* neutral judge, not every judge.

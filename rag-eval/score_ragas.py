@@ -15,7 +15,11 @@ benchmark — it comes from EMBEDDING_MODEL in the server config
 Usage:
     .client06-venv/bin/python rag-eval/score_ragas.py EVAL_DATA_JSON [JUDGE] [LIMIT]
 
-    JUDGE   judge model, default ollama/gemma3:27b-it-fp16 (the PoC's choice)
+    JUDGE   judge model, default ollama/gemma3:27b-it-fp16 (the PoC's choice).
+            `anthropic/claude-opus-5` is the neutral cross-judge from
+            EVALUATION-LIMITS.md §4.5 — every local model is also a contestant,
+            so none of them can answer whether gemma3's lead survives a judge
+            that is not gemma3. Needs ANTHROPIC_API_KEY set for the stack.
     LIMIT   optional; score only the first N rows
 """
 from __future__ import annotations
@@ -47,6 +51,32 @@ DEFAULT_METRICS = [
 ]
 METRICS = [m.strip() for m in os.environ["METRICS"].split(",")] \
     if os.environ.get("METRICS") else DEFAULT_METRICS
+
+
+def sampling_params(judge: str) -> dict:
+    """Sampling params for the judge, which differ by where the judge runs.
+
+    `max_tokens` must be generous everywhere: ragas asks the judge for JSON
+    (faithfulness sends one object per extracted statement), and at 1024 the
+    reply was truncated mid-string, so ragas' parser failed and took the whole
+    job down.
+
+    Two Anthropic-specific deviations, both for the cross-judge run:
+
+    - **No `temperature`.** Claude Opus 5 rejects `temperature`/`top_p`/`top_k`
+      outright; a non-default value is a 400, not a silently ignored field. This
+      costs the run nothing that it had: `temperature 0` never guaranteed
+      identical outputs on any model, which is why EVALUATION-LIMITS.md §4.6
+      had to measure a noise floor rather than assume determinism.
+    - **Double the token ceiling.** Thinking, if the endpoint enables it, is
+      billed against the same ceiling as the answer, so a budget sized for
+      answer-only JSON can truncate mid-reply — the failure above, with a new
+      cause. Cheap insurance: the judge emits short JSON, so the extra headroom
+      is only ever drawn on when something goes wrong.
+    """
+    if judge.startswith("anthropic/"):
+        return {"max_tokens": 8192}
+    return {"temperature": 0.0, "max_tokens": 4096}
 
 
 def main() -> None:
@@ -91,11 +121,7 @@ def main() -> None:
             "eval_candidate": {
                 "type": "model",
                 "model": judge,
-                # max_tokens must be generous: ragas asks the judge for JSON
-                # (faithfulness sends one object per extracted statement), and at
-                # 1024 the reply was truncated mid-string, so ragas' parser
-                # failed and took the whole job down.
-                "sampling_params": {"temperature": 0.0, "max_tokens": 4096},
+                "sampling_params": sampling_params(judge),
             },
             "scoring_params": {},
         },

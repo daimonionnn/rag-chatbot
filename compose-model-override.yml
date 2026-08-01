@@ -18,6 +18,13 @@ services:
       # start-stack.sh sources — never in a committed file. Empty is tolerated:
       # the toolgroup then 401s, which only affects web search.
       BRAVE_SEARCH_API_KEY: "${BRAVE_SEARCH_API_KEY:-}"
+      # Judge-only credential for the RAGAS cross-judge run (EVALUATION-LIMITS
+      # §4.5). Same rule as the Brave key: interpolated from the shell so it
+      # lives in the untracked .env.local, never in a committed file. Empty is
+      # not merely tolerated but the normal state — the anthropic provider is
+      # gated on this var, so unset means the provider is skipped entirely and
+      # the stack runs fully offline as before.
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
   rag-ui:
     # Raises the "Max Tokens" sampling-parameter slider's ceiling (and fixes it
     # actually being reachable), and stops every sidebar change from wiping the

@@ -48,6 +48,14 @@ RUN uv pip install --no-cache \
         'greenlet==3.2.4' \
         'langchain-community>=0.3,<0.4' \
         'llama-stack==0.6.0' 'llama-stack-api==0.6.0' 'llama-stack-client==0.6.0'
+
+# Backs the `remote::anthropic` inference provider, used only as a RAGAS judge
+# (EVALUATION-LIMITS.md §4.5 — a judge that is not one of the three contestants).
+# llama-stack ships the adapter but not its dependency, so importing the provider
+# fails with ModuleNotFoundError without this. The adapter is an OpenAIMixin
+# against api.anthropic.com/v1 and discovers models from the live Models API, so
+# no model allowlist has to be patched for newer Claude releases.
+RUN uv pip install --no-cache anthropic
 RUN pip uninstall -y uv
 
 # Fix non-latin-1 (e.g. Slovak č/š/ž) filenames silently failing to ingest:
@@ -65,6 +73,12 @@ RUN python /tmp/patch-ragas-embeddings-loop.py && rm /tmp/patch-ragas-embeddings
 # but the provider looks them up by the bare name, killing the job with KeyError.
 COPY patch-ragas-mode-metrics.py /tmp/patch-ragas-mode-metrics.py
 RUN python /tmp/patch-ragas-mode-metrics.py && rm /tmp/patch-ragas-mode-metrics.py
+
+# The provider asks the judge for text through the legacy /v1/completions API,
+# which Anthropic does not serve (404 on every call) — see the script's docstring
+# for why the fallback is scoped to that provider only.
+COPY patch-ragas-chat-completions.py /tmp/patch-ragas-chat-completions.py
+RUN python /tmp/patch-ragas-chat-completions.py && rm /tmp/patch-ragas-chat-completions.py
 
 COPY config-0.6.0.yaml /app/config.yaml
 

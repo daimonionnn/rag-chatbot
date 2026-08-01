@@ -41,6 +41,24 @@ providers:
       base_url: ${env.NEMO_URL:=http://nemo-guardrails:9000}/v1
       api_token: fake
       max_tokens: 4096
+  # Hosted judge for the RAGAS cross-judge run (EVALUATION-LIMITS.md §4.5). All
+  # three models under test are also candidate judges, so none of them is
+  # neutral; this provider exists to supply one that is. It is never selected in
+  # the UI's model picker and never generates answers — only `score_ragas.py`
+  # passes it as JUDGE. Gated on the key: with ANTHROPIC_API_KEY unset the
+  # provider_id resolves to empty and the provider is skipped, so the stack still
+  # starts fully offline (same trick as EMBEDDING_MODEL gating the eval provider).
+  - provider_id: ${env.ANTHROPIC_API_KEY:+anthropic}
+    provider_type: remote::anthropic
+    config:
+      api_key: ${env.ANTHROPIC_API_KEY:=}
+      # The adapter registers every model the account can see. Without this the
+      # UI's model picker fills up with a dozen Claude entries that would each
+      # silently bill if picked. One judge model, named explicitly — and since
+      # discovery is dynamic, switching judges is a one-line change here rather
+      # than a patch to a hardcoded table.
+      allowed_models:
+      - claude-opus-5
   - provider_id: sentence-transformers
     provider_type: inline::sentence-transformers
   vector_io:

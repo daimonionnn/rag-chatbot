@@ -5,14 +5,14 @@ ak sa preklad a originál rozchádzajú, platí originál.
 
 ## Stav prekladov
 
-| Dokument                                             | Preklad                        | Zdrojový commit |
-|------------------------------------------------------|--------------------------------|-----------------|
-| [`README.md`](../../README.md)                       | [README.md](README.md)         | `7f56dd2`       |
-| [`SETUP.md`](../../SETUP.md)                         | [SETUP.md](SETUP.md)           | `3ce3a92`       |
-| [`GUARDRAILS.md`](../../GUARDRAILS.md)               | [GUARDRAILS.md](GUARDRAILS.md) | `9e09e2a`       |
-| [`EVALUATION.md`](../../EVALUATION.md)               | [EVALUATION.md](EVALUATION.md) | `3ce3a92`       |
-| [`EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) | [EVALUATION-LIMITS.md](EVALUATION-LIMITS.md) | `3ce3a92` |
-| [`BUGS.md`](../../BUGS.md)                           | [BUGS.md](BUGS.md)             | `3ce3a92` |
+| Dokument                                             | Preklad                                      | Zdrojový commit |
+|------------------------------------------------------|----------------------------------------------|-----------------|
+| [`README.md`](../../README.md)                       | [README.md](README.md)                       | `7f56dd2`       |
+| [`SETUP.md`](../../SETUP.md)                         | [SETUP.md](SETUP.md)                         | `72e96d3`       |
+| [`GUARDRAILS.md`](../../GUARDRAILS.md)               | [GUARDRAILS.md](GUARDRAILS.md)               | `9e09e2a`       |
+| [`EVALUATION.md`](../../EVALUATION.md)               | [EVALUATION.md](EVALUATION.md)               | `72e96d3`       |
+| [`EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) | [EVALUATION-LIMITS.md](EVALUATION-LIMITS.md) | `3ce3a92`       |
+| [`BUGS.md`](../../BUGS.md)                           | [BUGS.md](BUGS.md)                           | `3ce3a92`       |
 
 ## Kontrola aktuálnosti
 

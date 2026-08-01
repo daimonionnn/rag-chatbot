@@ -1,4 +1,4 @@
-<!-- translated-from: 3ce3a92 -->
+<!-- translated-from: 72e96d3 -->
 # 1 — Lokálne spustiteľný setup
 
 > **Slovenský preklad.** Zdroj: [`../../SETUP.md`](../../SETUP.md) v commite
@@ -245,8 +245,9 @@ a naúčtovať; a judge sa dosahuje cez chat completions namiesto raw completion
 endpointu, ktorý používajú lokálni judge-ovia, čo je skutočný caveat krížových
 porovnaní, nie implementačný detail — pozri [BUGS.md](BUGS.md) A4.
 
-Nameraná cena, 40 riadkov × 6 metrík, `claude-opus-5`: **~$11 na model**, ~62 min
-wall clock. To nie je pomalšie než lokálny judge (§3.4 uvádza 15–17 s na
+Nameraná cena, 40 riadkov × 6 metrík, `claude-opus-5`: **$10.86 až $12.09 na
+model**, 59–67 min wall clock — rozptyl kopíruje dĺžku odpovedí hodnoteného
+modelu, nie počet riadkov (EVALUATION.md §3.10). To nie je pomalšie než lokálny judge (§3.4 uvádza 15–17 s na
 row-metric), lebo judge nesúperí o GPU s embedding modelom — rezidentný zostáva
 len 13,3 GiB embedding model, nie 54 GB LLM.
 

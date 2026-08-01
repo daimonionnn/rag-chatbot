@@ -1,8 +1,8 @@
-<!-- translated-from: 3ce3a92 -->
+<!-- translated-from: 72e96d3 -->
 # 3 — RAGAS evaluácia
 
 > **Slovenský preklad.** Zdroj: [`../../EVALUATION.md`](../../EVALUATION.md)
-> v commite `3ce3a92`. Anglický originál je zdroj pravdy — ak sa rozchádzajú,
+> v commite `72e96d3`. Anglický originál je zdroj pravdy — ak sa rozchádzajú,
 > platí on. Prehľad prekladov: [INDEX.md](INDEX.md).
 
 Adaptované z dvoch vzájomne sa dopĺňajúcich upstream repozitárov:
@@ -391,7 +391,28 @@ súťažiacim nie je nijako, `anthropic/claude-opus-5`, a hlási, čo sa pohlo.
 
 Nič sa negenerovalo nanovo. Uložené odpovede a ich retrieved contexts sa čítajú
 doslovne, takže **judge je jediné, čo sa oproti §3.7 líši**. Beh 2026-08-01,
-40 riadkov na model, ~62 min a ~$11 na model, nula zlyhaných volaní judge-a.
+40 riadkov na model, nula zlyhaných volaní judge-a.
+
+| Konfigurácia          | Wall clock | Cena       |
+|-----------------------|-----------:|-----------:|
+| gemma3                | 62,3 min   | $10.86     |
+| gemma4                | 59,0 min   | $10.91     |
+| qwen3.6               | 66,8 min   | $12.09     |
+| 2-riadkový smoke test | 2,5 min    | $0.50      |
+| **spolu**             | **~3,2 h** | **$34.36** |
+
+**Cena škáluje s dĺžkou hodnotených odpovedí, nie s počtom riadkov.** Odpovede
+qwen3.6 sú v tejto podmnožine o 47 % dlhšie než gemma3 (17 971 vs 12 203 znakov)
+pri bajtovo identických kontextoch, a beh stál o 11 % viac a trval o 13 % dlhšie.
+Rozklad na fixnú a dĺžkovo úmernú zložku dáva zhruba **76 % účtu na retrieved
+contexts a 24 % na odpovede** — kontexty sú pre každý model rovnaké a dominujú,
+kým dĺžka odpovede pohne celkom asi o štvrtinu svojej vlastnej pomernej zmeny.
+Ten istý rozklad predpovedá gemma4 (odpovede 1,002× gemma3) na $10.87 oproti
+skutočným $10.91.
+
+Rozpočet na krížové hodnotenie sa teda odhaduje z dĺžok odpovedí, nie z počtu
+otázok — a je to aj dôvod, prečo je najlacnejšie hodnotiť najstručnejší model,
+čo je vlastnosť hodnoteného modelu, nie judge-a.
 
 ### Podmnožina a prečo to nie je 40 náhodných riadkov
 

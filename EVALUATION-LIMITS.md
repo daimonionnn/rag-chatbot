@@ -166,6 +166,24 @@ unvalidated. Every metric that routes through the judge inherits that
 uncertainty — including the fluency score just proposed. A sample graded by a
 human speaker is the only way to calibrate it.
 
+**BUILT AND MEASURED, 2026-08-02 — [SLOVAK-EVAL.md](SLOVAK-EVAL.md).** Both
+additions exist now. The headline: **Slovak is not a handicap for any of the
+three models.** On 100 parallel Belebele items the sk−en gap is 2–3 items in a
+hundred for all of them, and rubric-scored grammar sits at 4.2/5 across the board
+with no model separated from the others.
+
+Two results worth carrying back here. The model this benchmark ranks *last*
+(qwen3.6) understands Slovak at least as well as the other two, which rules out
+weak Slovak as the cause of its ranking and leaves §4.2 and §4.10.4's
+length-versus-terse-reference explanation standing alone. And the Czech-leakage
+worry above was justified but harder to catch than proposed: qwen3.6 wrote
+`Této` for `Tieto`, and the orthographic check **missed it** because the word
+contains none of `ř ě ů`. A character-class check finds only Czech words carrying
+exclusive letters. The rubric found it; the cheap check could not.
+
+The caveat in this paragraph still stands in full — the rubric is one judge's
+opinion of 18 prompts, and calibration against a human speaker remains undone.
+
 ---
 
 ## 4.5 The judge is one of the contestants

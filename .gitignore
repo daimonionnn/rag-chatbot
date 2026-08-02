@@ -13,6 +13,10 @@ docs/*
 # Evaluation artefacts: generated, and derived from the internal docs above
 rag-eval/results/
 
+# Belebele slice: someone else's dataset (Meta, CC-BY-SA-4.0). The fetcher and
+# our own results are committed; the corpus is not redistributed here.
+sk-eval/belebele_*.json
+
 # Local runtime logs
 *.log
 

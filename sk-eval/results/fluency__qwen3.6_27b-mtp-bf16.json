@@ -1,0 +1,380 @@
+{
+ "model": "qwen3.6:27b-mtp-bf16",
+ "minutes": 10.5,
+ "rows": [
+  {
+   "id": "num-agree-1",
+   "stress": "numerals + noun agreement",
+   "prompt": "Napíš krátky odsek (3–4 vety), v ktorom uvedieš, že v čakárni boli 1 pacient, potom 2 pacienti, potom 5 pacientov a nakoniec 22 pacientov. Vety formuluj prirodzene, nie ako zoznam.",
+   "answer": "Ráno sa v čakárni zdržiaval len jeden pacient, ktorý si pokojne čítal časopis. O niečo neskôr sa v nej už zdržiavali dvaja pacienti a miestnosť sa pomaly začala plniť. Postupne prichádzali ďalší ľudia a k obedu tam čakalo už päť pacientov. K večernému času sa situácia výrazne zmenila a v preplnenej čakárni čakalo na svoj termín až dvadsaťdva pacientov.",
+   "czech_chars": [],
+   "slovak_chars": [
+    "ä",
+    "ô",
+    "ľ"
+   ],
+   "diacritic_rate": 0.1203,
+   "scores": {
+    "grammar": 5,
+    "naturalness": 4,
+    "task": 5,
+    "errors": [
+     "\"K večernému času\" → prirodzenejšie \"Podvečer\" / \"K večeru\"",
+     "opakovanie \"zdržiaval sa / zdržiavali sa\" pôsobí kostrbato, vhodnejšie \"bol / boli\", \"sedeli\"",
+     "\"čakalo na svoj termín\" → prirodzenejšie \"čakalo na vyšetrenie\""
+    ]
+   }
+  },
+  {
+   "id": "num-agree-2",
+   "stress": "numerals + currency + case",
+   "prompt": "Vysvetli v troch vetách, že príspevok je 1 euro pri jednom vyšetrení, 2 eurá pri dvoch, 5 eur pri piatich a 100 eur pri sto vyšetreniach.",
+   "answer": "Príspevok sa odvíja od počtu vyšetrení a pri jednom dosahuje jedno euro. Pri dvoch vyšetreniach je výška príspevku dve eurá, pri piatich päť eur a pri sto vyšetreniach sto eur. Táto sadzba tak presne zodpovedá uvedenému počtu poskytnutých výkonov.",
+   "czech_chars": [],
+   "slovak_chars": [
+    "ä"
+   ],
+   "diacritic_rate": 0.0927,
+   "scores": {
+    "grammar": 5,
+    "naturalness": 4,
+    "task": 5,
+    "errors": [
+     "\"pri jednom dosahuje jedno euro\" – prirodzenejšie \"pri jednom vyšetrení je to jedno euro\" (sloveso dosahovať evokuje vysokú hodnotu)"
+    ]
+   }
+  },
+  {
+   "id": "gen-plural",
+   "stress": "genitive plural",
+   "prompt": "Napíš vetu, v ktorej sa vyskytnú genitívy množného čísla slov: dieťa, ruka, oko, ucho, pleco.",
+   "answer": "Lekár posúdil zdravotný stav **detí**, **rúk**, **očí**, **uší** a **pliec**.\n\n*(Poznámka: Všetky uvedené podstatné mená sú v tejto vete správne skloňované do genitívu množného čísla.)*",
+   "czech_chars": [],
+   "slovak_chars": [],
+   "diacritic_rate": 0.1769,
+   "scores": {
+    "grammar": 5,
+    "naturalness": 5,
+    "task": 5,
+    "errors": []
+   }
+  },
+  {
+   "id": "aspect",
+   "stress": "verbal aspect",
+   "prompt": "Vysvetli v štyroch vetách rozdiel medzi tým, keď pacient *ide* k lekárovi, *chodí* k lekárovi, *pôjde* k lekárovi a *zašiel* k lekárovi.",
+   "answer": "Veta s „ide k lekárovi“ opisuje jednorazovú cestu, ktorá sa práve deje alebo je naplánovaná na veľmi blízku budúcnosť.  \nVeta s „chodí k lekárovi“ vyjadruje pravidelný, opakovaný zvyk navštevovať lekára v priebehu času.  \nVeta s „pôjde k lekárovi“ označuje plánovanú jednorazovú návštevu, ktorá sa ešte nestala a očakáva sa v budúcnosti.  \nVeta s „zašiel k lekárovi“ popisuje dokončenú minulosťnú návštevu s dôrazom na splnenie konkrétneho účelu a často aj na návrat späť.",
+   "czech_chars": [],
+   "slovak_chars": [
+    "ä",
+    "ô",
+    "ľ"
+   ],
+   "diacritic_rate": 0.1237,
+   "scores": {
+    "grammar": 3,
+    "naturalness": 3,
+    "task": 5,
+    "errors": [
+     "\"minulosťnú návštevu\" → správne \"minulú návštevu\" / \"návštevu v minulosti\"",
+     "\"dokončenú ... návštevu\" → prirodzenejšie \"ukončenú/uskutočnenú návštevu\"",
+     "\"popisuje\" → v spisovnej slovenčine skôr \"opisuje\"",
+     "\"na návrat späť\" → nadbytočné \"späť\", stačí \"na návrat\""
+    ]
+   }
+  },
+  {
+   "id": "formal-register",
+   "stress": "formal register, vykanie",
+   "prompt": "Napíš zdvorilú odpoveď poisťovne klientovi, ktorý sa sťažuje, že mu neuhradili príspevok. Vykaj mu, buď vecný a neospravedlňuj sa viackrát než raz.",
+   "answer": "Dobrý deň,\n\nďakujeme za tvoju správu ohľadom nevyplateného príspevku. Tvoj prípad sme preskúmali a zistili sme, že k úhrade nedošlo kvôli chýbajúcemu potvrdeniu o liečbe od ošetrujúceho lekára. Pre vyplatenie je potrebné tento dokument doložiť do 15 dní od doručenia tejto správy.\n\nOspravedlňujeme sa za nepríjemnosti, ktoré ti táto situácia spôsobila. Ak máš otázky alebo potrebuješ pomoc s získaním potvrdenia, kontaktuj nás na čísle 0800 XXX XX alebo na email@example.com. Tvoj prípad budeme riešiť ihneď po doručení chýbajúceho dokumentu.\n\nS pozdravom,  \nTím zákazníckej podpory [Názov poisťovne]",
+   "czech_chars": [],
+   "slovak_chars": [
+    "ô",
+    "ľ"
+   ],
+   "diacritic_rate": 0.1084,
+   "scores": {
+    "grammar": 4,
+    "naturalness": 4,
+    "task": 1,
+    "errors": [
+     "\"ďakujeme za tvoju správu\" → \"ďakujeme za Vašu správu\" (zadanie žiadalo vykanie)",
+     "\"ktoré ti táto situácia spôsobila\" → \"ktoré Vám táto situácia spôsobila\"",
+     "\"Ak máš otázky... kontaktuj nás\" → \"Ak máte otázky... kontaktujte nás\"",
+     "\"s získaním\" → \"so získaním\" (vokalizácia predložky)",
+     "\"na email@example.com\" → \"na e-mailovej adrese email@example.com\""
+    ]
+   }
+  },
+  {
+   "id": "prepositions",
+   "stress": "prepositions + case government",
+   "prompt": "Napíš päť viet, v ktorých použiješ predložky: k, s, so, zo, vďaka — každú v inej vete a s namieste použitým pádom.",
+   "answer": "Tu je päť viet splňujúcich tvoje podmienky:\n\n1. Idem dnes popoludní **k** lekárovi na pravidelnú kontrolu. *(predložka k + 3. pád)*\n2. Na spoločný obed som pozval **s** kolegom z marketingového oddelenia. *(predložka s + 7. pád)*\n3. Po dlhšej dobe som sa náhodou stretol **so** starým spolužiakom na námestí. *(predložka so + 7. pád)*\n4. Čistá voda prúdi **zo** studne priamo do plastového vedra. *(predložka zo + 2. pád)*\n5. **Vďaka** tvojej trpezlivosti sme celý projekt úspešne dokončili v termíne. *(predložka vďaka + 3. pád)*",
+   "czech_chars": [],
+   "slovak_chars": [
+    "ä"
+   ],
+   "diacritic_rate": 0.0992,
+   "scores": {
+    "grammar": 3,
+    "naturalness": 3,
+    "task": 4,
+    "errors": [
+     "\"splňujúcich\" → správne \"spĺňajúcich\"",
+     "\"Na spoločný obed som pozval s kolegom\" → chýba predmet/nesprávna väzba, správne napr. \"Na spoločný obed som šiel s kolegom\"",
+     "\"Po dlhšej dobe\" → čechizmus, správne \"Po dlhšom čase\""
+    ]
+   }
+  },
+  {
+   "id": "conditional",
+   "stress": "conditional mood",
+   "prompt": "Vysvetli v troch vetách v podmieňovacom spôsobe, čo by sa stalo, keby si klient nedodal doklad o zaplatení.",
+   "answer": "Dodávka tovaru alebo poskytovanie služby by sa automaticky pozastavilo do doby predloženia platného dokladu o zaplatení. Klient by bol vyzvaný na okamžité doplnenie chýbajúceho dokladu pod hrozbou účtovania dodatočných správnych poplatkov za spracovanie oneskorenej platby. V prípade nečinnosti po uplynutí stanovenej lehoty by sa objednávka jednostranne zrušila a všetky vykonané práce by sa fakturovali ako nedokončené.",
+   "czech_chars": [],
+   "slovak_chars": [],
+   "diacritic_rate": 0.0689,
+   "scores": {
+    "grammar": 5,
+    "naturalness": 4,
+    "task": 5,
+    "errors": [
+     "\"do doby predloženia\" → prirodzenejšie \"do predloženia\" / \"dovtedy, kým klient nepredloží\"",
+     "\"by sa pozastavilo\" pri dvojitom podmete (Dodávka... alebo poskytovanie...) pôsobí neisto — lepšie \"by sa pozastavila dodávka tovaru, resp. poskytovanie služby\""
+    ]
+   }
+  },
+  {
+   "id": "rytmicke-kratenie",
+   "stress": "rhythmic shortening rule",
+   "prompt": "Napíš tri vety, v ktorých použiješ slová: krásny, biely, múdry v tvare množného čísla a v minulom čase so slovesom byť.",
+   "answer": "1. Tí mladí herci boli krásni.\n2. Této zimné steny boli biele.\n3. Tí filozofi boli múdri.",
+   "czech_chars": [],
+   "slovak_chars": [],
+   "diacritic_rate": 0.1094,
+   "scores": {
+    "grammar": 3,
+    "naturalness": 3,
+    "task": 5,
+    "errors": [
+     "\"Této zimné steny\" → správne \"Tieto zimné steny\" (čechizmus/nesprávny tvar ukazovacieho zámena)",
+     "\"zimné steny\" – významovo neprirodzené spojenie, vhodnejšie napr. \"Tieto steny boli biele\""
+    ]
+   }
+  },
+  {
+   "id": "explain-simple",
+   "stress": "plain-language explanation",
+   "prompt": "Vysvetli osemročnému dieťaťu, čo je zdravotné poistenie. Maximálne päť viet.",
+   "answer": "Zdravotné poistenie je ako neviditeľná ochranná sieť pre tvoje zdravie. Každý mesiac sa do nej prispieva malým množstvom peňazí, aby sme mali vždy dostatok na pomoc. Keď sa niekto ochorenie alebo zraní, poistenie zaplatí návštevu lekára, lieky alebo nemocnicu. Vďaka tomu sa nemusíš báť, že by ti nemali pomôcť kvôli peniazom. Tvoji rodičia za teba toto poistenie platia, aby si bol vždy v bezpečí a mohol byť zdravý.",
+   "czech_chars": [],
+   "slovak_chars": [
+    "ô",
+    "ľ"
+   ],
+   "diacritic_rate": 0.0971,
+   "scores": {
+    "grammar": 3,
+    "naturalness": 3,
+    "task": 5,
+    "errors": [
+     "\"Keď sa niekto ochorenie alebo zraní\" → správne \"Keď niekto ochorie alebo sa zraní\"",
+     "\"prispieva sa malým množstvom peňazí\" → prirodzenejšie \"prispieva sa malou sumou peňazí\"",
+     "\"Každý mesiac sa do nej prispieva\" → prirodzenejšie \"Každý mesiac do nej ľudia prispievajú\"",
+     "\"aby sme mali vždy dostatok na pomoc\" → kostrbaté, napr. \"aby bolo dosť peňazí na liečbu\"",
+     "\"aby si bol vždy v bezpečí a mohol byť zdravý\" → prirodzenejšie \"aby si bol v bezpečí a zdravý\""
+    ]
+   }
+  },
+  {
+   "id": "summarize",
+   "stress": "compression, coherence",
+   "prompt": "Zhrň do dvoch viet: Peňaženka zdravia je program, v ktorom poisťovňa preplatí poistencovi vybrané zdravotné výdavky do stanoveného limitu, ak splnil podmienky preventívnych prehliadok a podal žiadosť cez elektronickú pobočku do konca kalendárneho roka.",
+   "answer": "Peňaženka zdravia je program poisťovne, ktorý poistencovi do stanoveného limitu preplatí vybrané zdravotné výdavky. Na získanie náhrady musí poistenec absolvovať preventívne prehliadky a podať žiadosť cez elektronickú pobočku najneskôr do konca kalendárneho roka.",
+   "czech_chars": [],
+   "slovak_chars": [
+    "ô"
+   ],
+   "diacritic_rate": 0.0921,
+   "scores": {
+    "grammar": 5,
+    "naturalness": 5,
+    "task": 5,
+    "errors": []
+   }
+  },
+  {
+   "id": "reasoning-sk-1",
+   "stress": "reasoning expressed in Slovak",
+   "prompt": "Klient má limit 100 eur ročne. V marci vyčerpal 40 eur, v júni 35 eur. V septembri žiada o 40 eur. Koľko mu poisťovňa uhradí a prečo? Odpovedz dvomi vetami.",
+   "answer": "Poisťovňa uhradí 25 eur, pretože po marcovom a júnovom vyčerpaní zostáva z ročného limitu len tento zvyšok. Vyplatená suma je obmedzená dostupným zostatkom, hoci klient v septembri žiadal vyšších 40 eur.",
+   "czech_chars": [],
+   "slovak_chars": [],
+   "diacritic_rate": 0.1091,
+   "scores": {
+    "grammar": 4,
+    "naturalness": 3,
+    "task": 5,
+    "errors": [
+     "žiadal vyšších 40 eur → žiadal o vyššiu sumu 40 eur / žiadal o 40 eur",
+     "Vyplatená suma je obmedzená dostupným zostatkom → Poisťovňa vyplatí len zostatok limitu (prirodzenejšie, menej kancelárske)",
+     "po marcovom a júnovom vyčerpaní → po čerpaní v marci a v júni"
+    ]
+   }
+  },
+  {
+   "id": "reasoning-sk-2",
+   "stress": "reasoning + negation",
+   "prompt": "Podmienka znie: príspevok nedostane ten, kto nemá absolvovanú preventívnu prehliadku, okrem detí do 3 rokov. Má naň nárok dvojročné dieťa bez prehliadky? Vysvetli v dvoch vetách.",
+   "answer": "Áno, dvojročné dieťa má nárok na príspevok aj bez absolvovanej preventívnej prehliadky, pretože výnimka sa explicitne vzťahuje na deti do 3 rokov. Táto veková skupina je teda oslobodená od podmienky splnenia prehliadky a nárok jej nevzniká až po uplynutí tretieho roku života.",
+   "czech_chars": [],
+   "slovak_chars": [],
+   "diacritic_rate": 0.0826,
+   "scores": {
+    "grammar": 5,
+    "naturalness": 4,
+    "task": 4,
+    "errors": [
+     "\"oslobodená od podmienky splnenia prehliadky\" → prirodzenejšie \"oslobodená od povinnosti absolvovať prehliadku\"",
+     "\"nárok jej nevzniká až po uplynutí tretieho roku života\" → logicky zmätené; správne napr. \"podmienka sa na ňu vzťahuje až po dovŕšení tretieho roku života\""
+    ]
+   }
+  },
+  {
+   "id": "ambiguity",
+   "stress": "handling an unanswerable question",
+   "prompt": "Koľko presne stojí operácia kolena vo VšZP v roku 2027? Ak to nevieš, povedz to priamo a stručne.",
+   "answer": "Presnú cenu operácie kolena vo VšZP pre rok 2027 neviem uviesť. Tarify na zdravotnícke výkony sa schvaľujú každoročne a pre rok 2027 zatiaľ neexistujú oficiálne zverejnené sadzobníky.\n\nV Slovenskej republike sú plánované operácie kolena (napr. artroskopia, rekonštrukcia väzov, endoprotéza) pri poistencom vo VšZP zvyčajne **plne hradené verejným zdravotným poistením** bez priamej platby od pacienta, ak sú lekársky indikované. Pacient môže byť povinný uhradiť len prípadné spoluúčasti na liekoch alebo špecifických implantátoch, ak nie sú plne kryté tarífou, ale presné sumy sa určujú až po vydaní oficiálnych sadzobníkov pre daný rok.\n\nPre aktuálne a overené informácie odporúčam kontaktovať priamo VšZP alebo sledovať vyhlášky Ministerstva zdravotníctva SR.",
+   "czech_chars": [],
+   "slovak_chars": [
+    "ä",
+    "ô",
+    "ľ"
+   ],
+   "diacritic_rate": 0.1032,
+   "scores": {
+    "grammar": 3,
+    "naturalness": 4,
+    "task": 4,
+    "errors": [
+     "\"pri poistencom vo VšZP\" → správne \"u poistencov VšZP\" / \"pri poistencoch\"",
+     "\"tarífou\" → správne \"tarifou\" (bez dĺžňa)",
+     "\"Tarify na zdravotnícke výkony\" → prirodzenejšie \"ceny (tarify) za zdravotné výkony\"",
+     "\"zdravotnícke výkony\" → ustálené je \"zdravotné výkony\""
+    ]
+   }
+  },
+  {
+   "id": "diacritics",
+   "stress": "diacritics under pressure",
+   "prompt": "Napíš štyri vety o dôležitosti prevencie. Použi v nich slová s ô, ľ, ŕ a ĺ.",
+   "answer": "1. Dôraz na pravidelnú prevenciu chráni ľudí pred vážnymi dôsledkami a výrazne predlžuje dĺžku života.\n2. Pôvodné ochorenia sa často dajú zvládnuť včas, čo bráni ich vzniku a ľuďom zabezpečí pokojnú dĺžku rokov.\n3. Dôkladná starostlivosť o zdravie predchádza mnohým problémom, čo chráni ľudí pred utrpením a predlžuje ich dĺžku života.\n4. Dôsledky zanedbanej prevencie sú často nevratné, preto včasná ochrana chráni ľudí a predlžuje ich dĺžku života.",
+   "czech_chars": [],
+   "slovak_chars": [
+    "ô",
+    "ĺ",
+    "ľ"
+   ],
+   "diacritic_rate": 0.1549,
+   "scores": {
+    "grammar": 5,
+    "naturalness": 2,
+    "task": 2,
+    "errors": [
+     "chýba akékoľvek slovo so slabikotvorným ŕ (napr. 'kŕdeľ', 'vŕtať', 'hŕba')",
+     "'zabezpečí pokojnú dĺžku rokov' → neprirodzená väzba, správnejšie 'zabezpečí pokojné roky života'",
+     "'Pôvodné ochorenia sa často dajú zvládnuť včas, čo bráni ich vzniku' → nelogické, napr. 'Začínajúce ochorenia sa dajú zvládnuť včas'",
+     "opakovaná fráza 'chráni ľudí a predlžuje ich dĺžku života' v troch vetách → štylistická monotónnosť",
+     "'predlžuje dĺžku života' → pleonazmus, stačí 'predlžuje život'"
+    ]
+   }
+  },
+  {
+   "id": "word-order",
+   "stress": "clitic word order",
+   "prompt": "Napíš tri vety, v ktorých sa vyskytnú zvratné slovesá so „sa“ a „si“ a zároveň príklonné tvary zámen (mu, jej, im).",
+   "answer": "1. Tá kniha sa mu veľmi páči.\n2. Tento film sa jej zdá príliš dlhý.\n3. Sestra jej vždy pomôže, keď si s tým nevie poradiť.",
+   "czech_chars": [],
+   "slovak_chars": [
+    "ô",
+    "ľ"
+   ],
+   "diacritic_rate": 0.1609,
+   "scores": {
+    "grammar": 5,
+    "naturalness": 5,
+    "task": 4,
+    "errors": [
+     "chýba príklonný tvar „im“ (použité len „mu“ a dvakrát „jej“)"
+    ]
+   }
+  },
+  {
+   "id": "style-shift",
+   "stress": "register shift",
+   "prompt": "Tú istú informáciu — že žiadosť bola zamietnutá pre chýbajúci doklad — napíš dvakrát: raz úradne, raz priateľsky a ľudsky.",
+   "answer": "**Úradná verzia:**  \nTýmto Vás informujeme, že Vaša žiadosť bola zamietnutá z dôvodu neúplnej dokumentácie, konkrétne pre chýbajúci doklad. Žiadosť bude možné znovu posúdiť po jej doplnení o požadovaný podklad v zákonnej lehote.\n\n**Priateľská a ľudská verzia:**  \nAhoj, bohužiaľ sme museli tvojú žiadosť zamietnuť, pretože nám chýba jeden doklad. Nechcem ťa trápiť – stačí ho len doplniť a my to radi skontrolujeme znova. Ak budeš mať akékoľvek otázky alebo potrebuješ radu, kedykoľvek sa ozvi, som tu pre teba! 💙",
+   "czech_chars": [],
+   "slovak_chars": [
+    "ô",
+    "ľ"
+   ],
+   "diacritic_rate": 0.125,
+   "scores": {
+    "grammar": 4,
+    "naturalness": 4,
+    "task": 5,
+    "errors": [
+     "tvojú žiadosť → tvoju žiadosť",
+     "nekonzistentná osoba: „sme museli“ vs. „Nechcem ťa trápiť“ → „nechceme ťa trápiť“",
+     "„bohužiaľ“ (poloprevzaté) → prirodzenejšie „žiaľ“"
+    ]
+   }
+  },
+  {
+   "id": "terminology",
+   "stress": "domain terminology",
+   "prompt": "Vysvetli rozdiel medzi pojmami poistenec, platiteľ poistného a poskytovateľ zdravotnej starostlivosti. Po jednej vete na každý.",
+   "answer": "**Poistenec** je fyzická osoba, ktorá má na základe platného poistného vzťahu nárok na poskytovanie zdravotnej starostlivosti.  \n**Platiteľ poistného** je subjekt (zamestnávateľ, štát alebo samostatne zárobkovo činná osoba), ktorý je zákonne povinný odvádzať poistné do zdravotných poisňovní za poistencov.  \n**Poskytovateľ zdravotnej starostlivosti** je právnická alebo fyzická osoba oprávnená vykonávať odbornú zdravotnú činnosť a poskytovať liečebné, preventívne alebo rehabilitačné služby.",
+   "czech_chars": [],
+   "slovak_chars": [
+    "ľ"
+   ],
+   "diacritic_rate": 0.1095,
+   "scores": {
+    "grammar": 4,
+    "naturalness": 5,
+    "task": 5,
+    "errors": [
+     "poisňovní → poisťovní"
+    ]
+   }
+  },
+  {
+   "id": "false-premise",
+   "stress": "resisting a false premise",
+   "prompt": "Keďže zdravotné poistenie na Slovensku je dobrovoľné, poraď mi, či sa oplatí ho zrušiť.",
+   "answer": "### ⚠️ Dôležité upozornenie: Zdravotné poistenie na Slovensku **nie je dobrovoľné**\n\nVaša predpokladaná premisa nie je správna. Podľa zákona č. 580/2004 Z. z. o zdravotnom poistení je **zdravotné poistenie na Slovensku povinné** pre všetkých občanov SR a cudzincov s trvalým pobytom. Nemôžete ho jednoducho „zrušiť\" alebo odhlásiť, ak máte na Slovensku trvalý pobyt a ste v pracovnom pomere, živnostník, dôchodca alebo študent.\n\n### 🔍 Prečo nemôžete poistenie zrušiť?\n1.  **Zákonná povinnosť:** Poistenie je automatické na základe vášho pobytu a príjmu. Zamestnávateľ vám odvody odvádza, ak ste v zmluvnom vzťahu. Ak ste nezamestnaný alebo živnostník, musíte si odvody platiť sám.\n2.  **Nedoplatky a pokuty:** Ak prestanete platiť odvody (napr. ako SZČO), vznikajú vám nedoplatky s úrokmi z omeškania. Sociálna poisťovňa alebo zdravotná poisťovňa môžu vymáhať dlhy exekúciou a hrozia aj pokuty za neplnenie povinností.\n3.  **Strata prístupu k zdravotnej starostlivosti:** Bez platného poistenia vám lekári a nemocnice nemusia poskytovať liečbu (okrem núdzových stavov, ktoré sa však môžu následne fakturovať). Nemáte nárok na lieky s úhradou, preventívne prehliadky ani špecializovanú starostlivosť.\n\n### ✅ Kedy je možné poistenie ukončiť alebo zmeniť?\nPoistenie môžete legálne ukončiť alebo zmeniť len v týchto prípadoch:\n-   **Trvalý odchod zo SR:** Ak sa presťahujete do inej krajiny EÚ/EHP a tam získate zdravotné poistenie, môžete na Slovensku poistenie ukončiť. Potrebujete potvrdenie o poistení z novej krajiny (formular E104 alebo podobný).\n-   **Zmena poisťovne:** Môžete sa prepísať z jednej zdravotnej poisťovne do inej, ale **musíte byť stále poistený**. Prepis je možný len raz za 12 mesiacov.\n-   **Štúdium v zahraničí:** Ak študujete v EÚ/EHP a ste tam poistený, môžete na Slovensku poistenie pozastaviť alebo ukončiť podľa dohôd o koordinácii sociálneho zabezpečenia.\n\n### 💡 Odporúčanie\n1.  **Nezrušujte poistenie** – hrozia vám vysoké nedoplatky, exekúcie a strata prístupu k zdravotnej starostlivosti.\n2.  **Overte si svoj status** – Kontaktujte svoju zdravotnú poisťovňu alebo navštívte portál [www.slovensko.sk](https://www.slovensko.sk) pre oficiálne informácie.\n3.  **Ak plánujete odchod zo SR** – Najprv zabezpečte poistenie v novej krajine a až potom vybavte ukončenie poistenia na Slovensku s potrebnými potvrdeniami.\n4.  **Konzultácia** – Pre špecifické situácie (napr. práca v zahraničí, štúdium) sa poraďte s odborníkom na sociálne zabezpečenie alebo na úrade práce a sociálnych vecí.\n\n📞 **Oficiálne zdroje:**\n-   Ministerstvo zdravotníctva SR: [www.mzsr.sk](https://www.mzsr.sk)\n-   Zdravotné poisťovne: Všeobecná, Dôvera, Union, Slovenská, ŠPZ\n-   Portál verejnej správy: [www.slovensko.sk](https://www.slovensko.sk)\n\n*Upozornenie: Táto odpoveď má informatívny charakter a nenahrádza odbornú právnu alebo daňovú poradňu. Zákony sa môžu meniť, vždy overte aktuálne informácie u oficiálnych inštitúcií.* 🇸🇰💙",
+   "czech_chars": [],
+   "slovak_chars": [
+    "ô",
+    "ľ"
+   ],
+   "diacritic_rate": 0.0943,
+   "scores": {
+    "grammar": 4,
+    "naturalness": 4,
+    "task": 5,
+    "errors": [
+     "\"formular E104\" → \"formulár E104\"",
+     "\"Vaša predpokladaná premisa nie je správna\" → \"Váš predpoklad nie je správny\" (pleonazmus/kalk)",
+     "\"Nezrušujte poistenie\" → \"Nerušte poistenie\" (nesprávny nedokonavý vid)",
+     "\"prepísať sa z jednej zdravotnej poisťovne do inej\" → \"zmeniť zdravotnú poisťovňu / prihlásiť sa do inej poisťovne\"",
+     "\"nenahrádza odbornú právnu alebo daňovú poradňu\" → \"nenahrádza odborné právne alebo daňové poradenstvo\""
+    ]
+   }
+  }
+ ]
+}

@@ -52,6 +52,7 @@ un-shallows and moves them if a pin is ever updated.
 | 2   | **[GUARDRAILS.md](GUARDRAILS.md)**               | NeMo Guardrails as a transparent proxy, the rails, and how the UI exposes rails-on/off |
 | 3   | **[EVALUATION.md](EVALUATION.md)**               | RAGAS evaluation through the TrustyAI llama-stack provider, metrics, and the harness |
 | 4   | **[EVALUATION-LIMITS.md](EVALUATION-LIMITS.md)** | What the evaluation does *not* measure — measured blind spots (facts vs. fluency, Slovak untested) and a prioritised improvement backlog |
+| 5   | **[SLOVAK-EVAL.md](SLOVAK-EVAL.md)**             | Whether Slovak itself holds the models back — parallel sk/en comprehension and a grammar rubric, the gap §4.4 identified |
 | —   | **[BUGS.md](BUGS.md)**                           | Every defect and trap hit across the project, with the fix |
 
 ---

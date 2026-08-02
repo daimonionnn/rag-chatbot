@@ -1,4 +1,4 @@
-<!-- translated-from: 3ce3a92 -->
+<!-- translated-from: df6294d -->
 # Chyby, pasce a opravy
 
 > **Slovenský preklad.** Zdroj: [`../../BUGS.md`](../../BUGS.md) v commite
@@ -155,6 +155,67 @@ v EVALUATION.md, takže `ollama/*` si drží bajtovo identickú cestu. Zvyšok �
 hostený judge je promptovaný cez chat, kým lokálni cez raw completion — je
 caveat toho krížového porovnania, nie niečo, čo by patch vedel odstrániť:
 neexistuje endpoint, na ktorom by sa dali promptovať oba druhy judge-ov rovnako.
+
+### A5. Thinking judge ticho zahadzuje riadky, a to dvakrát
+
+Namierenie krížového hodnotenia (§4.5) na qwen3.6 vyprodukovalo skóre s dierami
+a nikde žiadne zlyhanie. Dve samostatné príčiny, prvá zakrývala druhú.
+
+**Timeout.** `RunConfig` v ragas má default **180 s na jedno LLM volanie**. To
+bohato stačí judge-ovi bez thinkingu — gemma3 aj claude-opus-5 majú ~16 s na
+(riadok, metriku) — ale qwen3.6 nameral ~95 s na (riadok, metriku) a jednotlivé
+volania limit prekračovali:
+
+```
+ERROR ragas.executor: Exception raised in Job[11]: TimeoutError()
+```
+
+Keďže provider zámerne beží s `raise_exceptions: false` (aby jeden zlý riadok
+nezabil viachodinový job — pozri A2), riadok sa **ticho** stal NaN. V 2-riadkovom
+smoke teste to bola polovica `factual_correctness`, teda tej jedinej metriky,
+kvôli ktorej krížové hodnotenie existuje. Timeout nie je dosiahnuteľný cez
+`ragas_config` providera, ktorý vystavuje len `batch_size` / `show_progress` /
+`raise_exceptions` / `experiment_name` / `column_map`. Opravené v
+`patch-ragas-timeout.py`, ktorý číta `RAGAS_TIMEOUT` z prostredia; keď nie je
+nastavená, platí ragas default, takže existujúce behy sa nemenia.
+
+**Prázdny výstup, zamenený za rozbitý JSON.** So zdvihnutým timeoutom sa vynorilo
+iné zlyhanie:
+
+```
+ragas.prompt.pydantic_prompt: Prompt statement_generator_prompt failed to parse output
+ragas.prompt.pydantic_prompt: Prompt fix_output_format failed to parse output
+```
+
+čo sa číta ako thinking model produkujúci neparsovateľný JSON. Neprodukoval zlý
+JSON — neprodukoval **nič**. OpenAI-kompatibilný endpoint Ollamy účtuje reasoning
+tokeny voči `max_tokens`, ale nevracia ich, takže judge, ktorý minie celý strop
+na uvažovanie, vráti `finish_reason: "length"` s nula znakmi textu. Namerané na
+jednom riadku podmnožiny:
+
+| `max_tokens` | finish_reason | znakov výstupu | completion tokens | parsuje |
+|-------------:|---------------|---------------:|------------------:|---------|
+| 4096         | length        | 0              | 4096              | nie     |
+| 8192         | stop          | 550            | 5121              | áno     |
+| 16384        | stop          | 550            | 5121              | áno     |
+
+~4900 z tých tokenov bolo uvažovanie. Všimni si druhý riadok logu: samoopravný
+prompt `fix_output_format` z ragas išiel *tomu istému modelu s tým istým stropom*
+a vyprodukoval to isté prázdno — záchranná sieť je z rovnakej látky ako diera.
+
+Opravené cez `THINKING_JUDGES` v `score_ragas.py`, ktorý zdvihne strop na 16384
+pre judge-ov, o ktorých vieme, že uvažujú. Judge-ovia bez thinkingu si držia
+4096, takže každé skóre už zapísané v EVALUATION.md ostáva reprodukovateľné.
+
+**Obe opravy sú potrebné súčasne** a ani jedna nenahrádza druhú: väčší rozpočet
+znamená dlhšie volania, ktoré by bez zdvihnutého timeoutu padali na čase. S oboma
+tri 40-riadkové behy oskórovali **240 z 240 jednotiek**.
+
+**Všeobecný tvar problému**, ktorý stojí za prenesenie do akéhokoľvek harnessu:
+timeout na volanie plus zhovievavé ošetrenie chýb premení pomalého judge-a na
+*ticho zaujatého*. Riadky, ktoré vypadnú, nie sú náhodné — sú to tie, ktoré judge
+považoval za najťažšie, čo je presne tá populácia, o ktorej metrika kvality má
+vypovedať.
 
 ## B. Tiché zlyhania (žiadna chyba, funkcia len chýba)
 

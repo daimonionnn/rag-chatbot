@@ -1,8 +1,8 @@
-<!-- translated-from: 72e96d3 -->
+<!-- translated-from: df6294d -->
 # 3 — RAGAS evaluácia
 
 > **Slovenský preklad.** Zdroj: [`../../EVALUATION.md`](../../EVALUATION.md)
-> v commite `72e96d3`. Anglický originál je zdroj pravdy — ak sa rozchádzajú,
+> v commite `df6294d`. Anglický originál je zdroj pravdy — ak sa rozchádzajú,
 > platí on. Prehľad prekladov: [INDEX.md](INDEX.md).
 
 Adaptované z dvoch vzájomne sa dopĺňajúcich upstream repozitárov:
@@ -461,19 +461,21 @@ qwen3.6 sa udrží (zmena −0.016 je vnútri šumového pásma nižšie). Hypot
 mierila správnym smerom na nesprávny cieľ: confound bol skutočný, ale margin
 gemma3 **podhodnocoval**, nie vyrábal.
 
-### Čo neprežilo: druhé miesto
+### Druhé miesto: odstup sa hýbe, poradie nie
 
 | `factual_correctness` | judge gemma3 | judge claude-opus-5 |
 |-----------------------|-------------:|--------------------:|
 | gemma4 − qwen3.6      | +0.0636      | **+0.0039**         |
 
-Pod neutrálnym judge-om sú tieto dva nerozoznateľné — 0.0039 je šestina
-rozlíšenia tejto vzorky. Tých šesť bodov, ktoré ich delilo, bol podstatne názor
-gemma3, nie vlastnosť odpovedí. gemma4 si drží `faithfulness`, qwen3.6
-`answer_relevancy`, a metrika, ktorá to mala rozseknúť, to neseká.
+Pod týmto judge-om sú tieto dva nerozoznateľné — 0.0039 je šestina rozlíšenia
+vzorky — tam, kde ich gemma3 delila o šesť bodov. Na dvoch judge-och to vyzerá
+tak, že druhé miesto je názor judge-a, nie vlastnosť odpovedí.
 
-**Poradie sa teda delí na dve časti.** „gemma3 prvá" je zistenie o modeloch.
-„gemma4 druhá, qwen3.6 tretia" bolo zistenie o judge-ovi.
+**Tretieho judge-a to neprežije.** §3.11 dopĺňa maticu a nachádza tú istú dvojicu
+oddelenú o +0.0995 pod qwen3.6 — naprieč tromi judge-mi teda odstup siaha od
+remízy po desať bodov, kým *poradie* sa neprevráti ani raz. Tvrdenie, ktoré táto
+sekcia pôvodne vyslovila — že druhé miesto bolo artefakt — bolo zovšeobecnením
+výsledku jedného judge-a; opravené čítanie je v §3.11.
 
 ### Úrovne metrík závisia od judge-a, poradia nie
 
@@ -533,3 +535,91 @@ je zdokumentovaný, nie odstránený.
 Dve ďalšie obmedzenia: 40 riadkov namiesto 182, s dôsledkom na rozlíšenie vyššie;
 a jeden judge namiesto plnej matice 3×3, takže toto hovorí, že náskok gemma3
 prežije *tohto* neutrálneho judge-a, nie každého.
+
+---
+
+## 3.11 Plná matica judge-ov 3×3
+
+§3.10 zodpovedala otázku z §4.5 jedným neutrálnym judge-om. Táto sekcia dopĺňa
+maticu tretím — qwen3.6 skóruje všetky tri modely vrátane vlastných odpovedí — a
+tretí judge zároveň rozhoduje otázku self-preference a opravuje tvrdenie, ktoré
+§3.10 vyslovila na dôkaze jedného judge-a.
+
+Beh 2026-08-01 → 2026-08-02, 40 riadkov na model, 368 / 372 / 386 min na beh,
+**0 z 240 riadkov neoskórovaných v každom behu**. Rozbehať thinking model ako
+judge-a si vyžiadalo dve opravy (BUGS.md A5); pred nimi ticho zahadzoval riadky.
+
+### `factual_correctness` — metrika, o ktorú v celej otázke ide
+
+| Judge ↓       | gemma3 | gemma4 | qwen3.6    | Víťaz  |
+|---------------|-------:|-------:|-----------:|--------|
+| gemma3        | 0.9023 | 0.8369 | 0.7733     | gemma3 |
+| claude-opus-5 | 0.8828 | 0.7775 | 0.7728     | gemma3 |
+| qwen3.6       | 0.8467 | 0.7183 | **0.6188** | gemma3 |
+
+**gemma3 vyhráva pod všetkými tromi judge-mi**, vrátane tých dvoch, ktoré sú jej
+konkurentmi. To je tak rozhodnuté, ako to tento benchmark vie rozhodnúť.
+
+### qwen3.6 sa nezvýhodňuje — na seba je najprísnejšia
+
+Zvýraznených 0.6188 je najnižšia hodnota v celej matici a qwen3.6 ju dala
+vlastným odpovediam. Prísnosť každého judge-a voči neutrálnemu:
+
+| Hodnotený model         | skóre qwen3.6 − skóre claude |
+|-------------------------|-----------------------------:|
+| gemma3                  | −0.036                       |
+| gemma4                  | −0.059                       |
+| **qwen3.6 (sama sebe)** | **−0.154**                   |
+
+qwen3.6 zráža všetkých, ale **seba zráža trikrát tvrdšie než súperov**. Čokoľvek
+tento judge robí, self-preference to nie je.
+
+Tým padá aj zvyšné podozrenie voči gemma3. gemma3 hodnotí samu seba o +0.0195
+vyššie než neutrálny judge — **pod rozlíšením vzorky, ktoré je 0.025**. Naprieč
+tromi judge-mi teda nie je merateľná self-preference ani u jedného modelu, ktorý
+hodnotil vlastnú prácu. Mechanizmus z §4.5 je v literatúre reálny; tu detegovať
+sa nedá.
+
+### Čo je jednomyseľné a čo nie
+
+| Metrika             | judge gemma3 | judge claude | judge qwen3.6 | Robustné?         |
+|---------------------|--------------|--------------|---------------|-------------------|
+| factual_correctness | gemma3       | gemma3       | gemma3        | áno               |
+| answer_similarity   | gemma3       | gemma3       | gemma3        | áno (bez judge-a) |
+| answer_relevancy    | qwen3.6      | qwen3.6      | qwen3.6       | áno               |
+| faithfulness        | gemma4       | gemma4       | **gemma3**    | **nie**           |
+
+`faithfulness` je jediná metrika, ktorej víťaz sa mení podľa judge-a — gemma4 ju
+berie pod dvomi, gemma3 pod tretím (0.9875 vs 0.9599). §3.9 už predtým uviedla,
+že výhra gemma4 na `faithfulness` leží vnútri šumového pásma voči gemma3; judge,
+ktorý ju prevráti, to potvrdzuje. „gemma4 je najvernejšia" treba brať ako
+nepodložené.
+
+`answer_similarity` je **identická na štyri desatinné miesta pod všetkými tromi
+judge-mi**, ako musí byť — kosínusová podobnosť embeddingov, bez judge-a
+v slučke. Tri nezávislé skórovania, ktoré sa zhodujú presne, sú kontrolou, vďaka
+ktorej sa dá zvyšku tabuľky veriť.
+
+### Opravené čítanie druhého miesta
+
+| `factual_correctness` | judge gemma3 | judge claude | judge qwen3.6 |
+|-----------------------|-------------:|-------------:|--------------:|
+| gemma4 − qwen3.6      | +0.0636      | +0.0047      | +0.0995       |
+
+§3.10 videla prostredný stĺpec a uzavrela, že druhé miesto je artefakt judge-a.
+S tretím stĺpcom to neplatí: odstup siaha od remízy po desať bodov, ale **poradie
+sa neprevráti nikdy**. claude-opus-5 je tu outlier, nie rozhodca — poučenie znie,
+že jeden neutrálny judge meria názor jedného judge-a, čo je presne tá istá pasca,
+akú identifikovala §4.5, o úroveň vyššie.
+
+**Poradie na `factual_correctness` — gemma3, gemma4, qwen3.6 — je teda
+jednomyseľné naprieč tromi judge-mi. Od judge-a závisí to, ako ďaleko od seba sú,
+a to sa líši dvadsaťnásobne.**
+
+### Čo to stále nerieši
+
+Traja judge-ovia nie sú náhodná vzorka judge-ov a dvaja z nich sú súťažiaci.
+Dĺžka odpovede ostáva confoundnutá s identitou modelu (§4.10.4), podmnožina má
+40 riadkov s rozlíšením 0.025 a neutrálny judge je promptovaný cez iný endpoint
+než lokálni dvaja (BUGS.md A4). Nič z toho sa nedá vyriešiť pridaním tretieho
+stĺpca; rieši to lepší dataset (§4.2, §4.10.2).

@@ -1,8 +1,8 @@
-<!-- translated-from: 3ce3a92 -->
+<!-- translated-from: df6294d -->
 # 4 — Čo táto evaluácia **nemeria**
 
 > **Slovenský preklad.** Zdroj:
-> [`../../EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) v commite `3ce3a92`.
+> [`../../EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) v commite `df6294d`.
 > Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on. Prehľad
 > prekladov: [INDEX.md](INDEX.md).
 
@@ -207,15 +207,28 @@ bol skutočný, ale mieril opačne: gemma3 hodnotiaca samu seba svoj margin
 *podhodnocovala*, nie vyrábala. Obava, ktorú táto sekcia vzniesla, bola
 oprávnená — záver, ktorého sa obávala, nie.
 
-Čo neprežilo, je časť, o ktorú sa nikto nebál. gemma4 a qwen3.6 delilo na
-`factual_correctness` +0.064 pod gemma3 a **+0.004** pod neutrálnym judge-om —
-nerozoznateľné, na šestine rozlíšenia vzorky. **„gemma3 prvá" je zistenie
-o modeloch; „gemma4 druhá, qwen3.6 tretia" bolo zistenie o judge-ovi.**
+Čo neprežilo, je časť, o ktorú sa nikto nebál — alebo tak to aspoň vyzeralo pri
+dvoch judge-och. gemma4 a qwen3.6 delilo na `factual_correctness` +0.064 pod
+gemma3 a **+0.004** pod neutrálnym judge-om, čo sa čítalo tak, že druhé miesto je
+artefakt.
 
-Dve veci to nezatvára. Neutrálny judge je promptovaný cez chat completions, kým
+**Tretí judge to opravil** ([EVALUATION.md §3.11](EVALUATION.md), 2026-08-02).
+Pod qwen3.6 je tá istá dvojica oddelená o +0.0995 — naprieč tromi judge-mi teda
+odstup siaha od remízy po desať bodov, kým poradie sa neprevráti ani raz.
+Neutrálny judge bol outlier, nie rozhodca, a zovšeobecniť z neho bola tá istá
+chyba, pred akou táto sekcia varuje, o úroveň vyššie.
+
+**Self-preference sa tu nedá detegovať vôbec.** qwen3.6 hodnotí vlastné odpovede
+0.6188 — najnižšia hodnota v celej matici — a je na seba trikrát prísnejšia než
+na súperov. gemma3 hodnotí samu seba o +0.0195 vyššie než neutrálny judge, čo je
+pod rozlíšením vzorky 0.025. Ani jeden z modelov, ktoré hodnotili vlastnú prácu,
+si neprihral.
+
+Čo to stále nezatvára. Neutrálny judge je promptovaný cez chat completions, kým
 lokálni používajú raw text completions (BUGS.md A4), takže „iný judge" a „iné
-zarámovanie" sú navzájom confoundnuté. A jeden neutrálny judge je jeden stĺpec,
-nie matica 3×3 — tvrdenie znie, že náskok gemma3 prežije *tohto* judge-a.
+zarámovanie" sú navzájom confoundnuté. A traja judge-ovia nie sú náhodná vzorka
+judge-ov — dvaja z nich sú súťažiaci — takže „self-preference sa nedá detegovať"
+je tvrdenie o týchto troch, pri rozlíšení vzorky 0.025.
 
 ---
 
@@ -290,10 +303,13 @@ nájdený rozdiel medzi modelmi.
    produkčný kompromis, ktorý súčasná tabuľka úplne skrýva.
 5. **Reportovať retrieval metriky raz**, nie per model (§4.1). Odstráni zavádzajúci
    stĺpec — pri dvoch z troch modelov potvrdene bit-presne rovnaký.
-6. ~~**Krížové hodnotenie na podmnožine 40 otázok** (§4.5).~~ **Hotové,
-   2026-08-01** — náskok gemma3 obstál a narástol; poradie gemma4/qwen3.6
-   neobstálo. Zostáva doplniť ďalšie dva stĺpce matice, ktoré by povedali, či
-   prvé miesto prehodí *ktorýkoľvek* judge, nielen tento jeden.
+6. ~~**Krížové hodnotenie na podmnožine 40 otázok** (§4.5).~~ **Hotové — plná
+   matica 3×3, 2026-08-02** ([EVALUATION.md §3.11](EVALUATION.md)).
+   `factual_correctness` radí gemma3 > gemma4 > qwen3.6 pod všetkými tromi
+   judge-mi; self-preference sa nedá detegovať ani u jedného modelu, ktorý
+   hodnotil sám seba; jediné nerobustné poradie je výhra gemma4 na
+   `faithfulness`, ktorú tretí judge prevracia. Ďalej to už nemá zmysel tlačiť —
+   zvyšná neistota je v datasete (body 0 a 7), nie v judge-ovi.
 7. **Rozšíriť testovaciu sadu**: parafrázy, otázky cez viac dokumentov,
    neodpovedateľné otázky (§4.2). Najväčšia zmena a tá, ktorá by z benchmarku
    urobila meranie uvažovania namiesto kopírovania.

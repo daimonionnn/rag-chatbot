@@ -1,4 +1,4 @@
-<!-- translated-from: 7f56dd2 -->
+<!-- translated-from: 3fdaa91 -->
 # Enterprise RAG Chatbot — lokálna reprodukcia
 
 > **Slovenský preklad.** Zdroj: [`../../README.md`](../../README.md) v commite
@@ -54,6 +54,7 @@ niekedy zmení, skript klon odplytčí (`unshallow`) a presunie.
 | 2   | **[GUARDRAILS.md](GUARDRAILS.md)**               | NeMo Guardrails ako transparentný proxy, samotné rails a ako UI vystavuje prepínač rails zap/vyp |
 | 3   | **[EVALUATION.md](EVALUATION.md)**               | RAGAS evaluácia cez TrustyAI llama-stack provider, metriky a harness |
 | 4   | **[EVALUATION-LIMITS.md](EVALUATION-LIMITS.md)** | Čo evaluácia **nemeria** — odmerané slepé miesta (fakty vs. plynulosť, slovenčina netestovaná) a backlog zlepšení podľa priority |
+| 5   | **[SLOVAK-EVAL.md](SLOVAK-EVAL.md)**             | Či modely brzdí samotná slovenčina — paralelné sk/en porozumenie a rubrika na gramatiku, teda diera pomenovaná v §4.4 |
 | —   | **[BUGS.md](BUGS.md)**                           | Každá chyba a pasca, na ktorú sme v projekte narazili, spolu s opravou |
 
 ---

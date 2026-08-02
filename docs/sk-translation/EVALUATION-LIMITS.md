@@ -1,8 +1,8 @@
-<!-- translated-from: 37f150b -->
+<!-- translated-from: 3fdaa91 -->
 # 4 — Čo táto evaluácia **nemeria**
 
 > **Slovenský preklad.** Zdroj:
-> [`../../EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) v commite `37f150b`.
+> [`../../EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) v commite `3fdaa91`.
 > Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on. Prehľad
 > prekladov: [INDEX.md](INDEX.md).
 
@@ -175,6 +175,25 @@ slovenský natívny evaluátor, a jeho schopnosť posudzovať slovenské tvrdeni
 sama neoverená. Každá metrika, ktorá ide cez judge-a, tú neistotu dedí — vrátane
 práve navrhovaného skóre plynulosti. Jediný spôsob, ako to kalibrovať, je vzorka
 ohodnotená človekom.
+
+**POSTAVENÉ A ODMERANÉ, 2026-08-02 — [SLOVAK-EVAL.md](SLOVAK-EVAL.md).** Obe
+doplnenia už existujú. Hlavný výsledok: **slovenčina nie je handicapom ani pre
+jeden z tých troch modelov.** Na 100 paralelných Belebele položkách je medzera
+sk−en 2–3 položky zo sta u všetkých a gramatika hodnotená rubrikou sedí na 4.2/5
+naprieč všetkými, bez odlíšenia ktoréhokoľvek modelu.
+
+Dva výsledky stojí za to preniesť sem. Model, ktorý tento benchmark radí
+*posledný* (qwen3.6), rozumie slovenčine prinajmenšom tak dobre ako ostatné dva,
+čo vylučuje slabú slovenčinu ako príčinu jeho poradia a necháva vysvetlenie zo
+§4.2 a §4.10.4 — dĺžka odpovede oproti stručnej referencii — stáť osamote.
+A obava o prienik češtiny vyššie bola oprávnená, ale ťažšie zachytiteľná, než
+navrhovala: qwen3.6 napísala `Této` namiesto `Tieto` a pravopisná kontrola to
+**nezachytila**, lebo to slovo neobsahuje ani jedno z `ř ě ů`. Kontrola tried
+znakov nájde len české slová nesúce exkluzívne písmená. Rubrika to našla, lacná
+kontrola nie.
+
+Výhrada v tomto odseku platí naďalej v plnom rozsahu — rubrika je názor jedného
+judge-a na 18 promptov a kalibrácia voči rodenému hovorcovi ostáva nespravená.
 
 ---
 

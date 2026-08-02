@@ -1,8 +1,8 @@
-<!-- translated-from: df6294d -->
+<!-- translated-from: 37f150b -->
 # 4 — Čo táto evaluácia **nemeria**
 
 > **Slovenský preklad.** Zdroj:
-> [`../../EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) v commite `df6294d`.
+> [`../../EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) v commite `37f150b`.
 > Anglický originál je zdroj pravdy — ak sa rozchádzajú, platí on. Prehľad
 > prekladov: [INDEX.md](INDEX.md).
 
@@ -290,8 +290,10 @@ nájdený rozdiel medzi modelmi.
 
 0. **Opraviť tých 23 duplicitných otázok s úzkou referenciou** (§4.10.2). Odmerane
    stláča `factual_correctness` viac než akýkoľvek rozdiel medzi modelmi
-   v benchmarku, a to u všetkých troch modelov. Nič iné z tohto zoznamu nemá cenu
-   robiť skôr.
+   v benchmarku, a to u všetkých troch modelov — absolútnym číslam sa teda nedá
+   veriť, kým sa to neopraví. Poradie na tom ale **nestojí**: §4.10.5 odmerala, že
+   odstránenie tých riadkov nemení žiadneho víťaza. Opraviť to treba kvôli číslam,
+   nie kvôli záveru.
 1. **Šumový prah** z opakovaných behov (§4.6, §4.10.1). Bez neho nie je ani jeden
    z nájdených 3–5 bodových rozdielov obhájiteľný ako skutočný.
 2. **Detekcia jazyka na výstupe** pri každej odpovedi (§4.4). Najlacnejšia
@@ -425,3 +427,59 @@ dobre podložené. Je to ten istý mechanizmus ako v §4.10.2, len pôsobiaci pl
 namiesto binárnej chyby datasetu — ďalší dôvod, prečo sa `answer_similarity`
 a `factual_correctness` nemajú čítať ako posledné slovo o kvalite bez metrík
 plynulosti a relevantnosti vedľa nich.
+
+
+### 4.10.5 Dala by iná sada otázok iného víťaza? Odmerané
+
+§4.10.1 namietala, že pri jednom behu na model neexistuje rozdelenie, voči
+ktorému by sa dal 3–5 bodový rozdiel posúdiť. Existuje, a nepotrebuje opakovaný
+beh: per-riadkové skóre už samo je vzorka, takže jej prevzorkovanie odpovie na
+to, koľko z poradia je *sada otázok* a nie modely.
+
+Dva testy, oba na plnom behu súdenom gemma3.
+
+**Odstránenie duplikátov nemení žiadneho víťaza.** Po odobratí všetkých 46
+duplicitných riadkov (§4.10.2) a preradení na zvyšných 136 unikátnych:
+
+| Metrika             | všetky riadky          | bez duplikátov      |
+|---------------------|------------------------|---------------------|
+| factual_correctness | gemma3 (náskok +0.046) | gemma3 (**+0.058**) |
+| answer_similarity   | gemma3                 | gemma3              |
+| faithfulness        | gemma4                 | gemma4              |
+| answer_relevancy    | qwen3.6                | qwen3.6             |
+
+Náskok gemma3 *rastie*, čo sedí so zistením §4.10.2, že práve tie riadky ju
+penalizovali najviac. Defekt datasetu teda deformuje absolútne čísla bez toho,
+aby sa dotkol poradia.
+
+**Bootstrap cez otázky.** 10 000 prevzorkovaní s vrátením zo 136 unikátnych
+otázok, so záznamom, ktorý model zakaždým vyhral:
+
+| Metrika             | gemma3      | gemma4     | qwen3.6    |
+|---------------------|------------:|-----------:|-----------:|
+| factual_correctness | **100,0 %** | 0,0 %      | 0,0 %      |
+| answer_similarity   | **100,0 %** | 0,0 %      | 0,0 %      |
+| faithfulness        | 20,9 %      | **78,3 %** | 0,9 %      |
+| answer_relevancy    | 0,0 %       | 17,6 %     | **82,4 %** |
+
+**Dve výhry gemma3 neprehrali ani raz v desaťtisíc prevzorkovaniach.** Nie sú
+teda šťastným ťahom otázok.
+
+Nestabilné sú výhry tých druhých. `faithfulness` pripadne gemma3 zhruba
+v jednom prevzorkovaní z piatich — a je to tá istá metrika, ktorej víťaza podľa
+§3.11 prevracia zmena judge-a. Dve nezávislé perturbácie, vzorka otázok a judge,
+ukazujú na ten istý výsledok. „gemma4 je najvernejšia" treba považovať za
+nepodložené ani jednou z tých ciest.
+
+**Na čo to neodpovedá.** Bootstrap prevzorkováva *túto* zásobu, takže hovorí
+o „inej vzorke podobných otázok", nie o „inom druhu otázok". §4.2 odmerala, že
+99 % otázok aj ich referenčných odpovedí sa doslovne nachádza v ingestovanom
+PDF — je to úloha „nájdi a skopíruj". Sada postavená na parafrázach, otázkach cez
+viac dokumentov a neodpovedateľných otázkach by mohla preusporiadať všetko a
+žiadne prevzorkovanie súčasnej sady to nevidí. gemma3 vyhráva v produkovaní textu
+najbližšieho stručnej FAQ referencii; to bolo odmerané, a nie je to to isté
+tvrdenie ako „gemma3 je najlepší model".
+
+**Dôsledok pre backlog.** Bod 0 (oprava duplikátov) ostáva prvý kvôli absolútnym
+číslam, ktoré preukázateľne deformuje — ale teraz vieme, že pre poradie **nie je**
+nosný. Skutočná expozícia poradia je bod 7, rozšírenie testovacej sady.

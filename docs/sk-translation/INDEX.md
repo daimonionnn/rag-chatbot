@@ -11,7 +11,7 @@ ak sa preklad a originál rozchádzajú, platí originál.
 | [`SETUP.md`](../../SETUP.md)                         | [SETUP.md](SETUP.md)                         | `72e96d3`       |
 | [`GUARDRAILS.md`](../../GUARDRAILS.md)               | [GUARDRAILS.md](GUARDRAILS.md)               | `9e09e2a`       |
 | [`EVALUATION.md`](../../EVALUATION.md)               | [EVALUATION.md](EVALUATION.md)               | `df6294d`       |
-| [`EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) | [EVALUATION-LIMITS.md](EVALUATION-LIMITS.md) | `df6294d`       |
+| [`EVALUATION-LIMITS.md`](../../EVALUATION-LIMITS.md) | [EVALUATION-LIMITS.md](EVALUATION-LIMITS.md) | `37f150b`       |
 | [`BUGS.md`](../../BUGS.md)                           | [BUGS.md](BUGS.md)                           | `df6294d`       |
 
 ## Kontrola aktuálnosti

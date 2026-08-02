@@ -459,20 +459,22 @@ qwen3.6 holds (the −0.016 change is inside the noise floor below). §4.5's
 hypothesis pointed the right way at the wrong target: the confound was real, but
 it was *understating* gemma3's margin, not manufacturing it.
 
-### What does not survive: second place
+### Second place: the margin moves, the order does not
 
 | `factual_correctness` | judge gemma3 | judge claude-opus-5 |
 |-----------------------|-------------:|--------------------:|
 | gemma4 − qwen3.6      | +0.0636      | **+0.0039**         |
 
-Under a neutral judge these two are indistinguishable — 0.0039 is a sixth of this
-sample's resolution. The six points that separated them were substantially
-gemma3's opinion rather than a property of the answers. gemma4 keeps
-`faithfulness` and qwen3.6 keeps `answer_relevancy`, and the metric that was
-supposed to break the tie does not break it.
+Under this judge the two are indistinguishable — 0.0039 is a sixth of the
+sample's resolution — where gemma3 separated them by six points. On two judges
+that reads as second place being the judge's opinion rather than a property of
+the answers.
 
-**So the ranking splits in two.** "gemma3 first" is a finding about the models.
-"gemma4 second, qwen3.6 third" was a finding about the judge.
+**It does not survive a third judge.** §3.11 completes the matrix and finds the
+same pair separated by +0.0995 under qwen3.6 — so across three judges the margin
+ranges from a tie to ten points while the *order* never reverses. The claim this
+section originally made, that second place was an artefact, was one judge's
+result generalised too far; see §3.11 for the corrected reading.
 
 ### Metric levels are judge-dependent; rankings are not
 
@@ -532,3 +534,91 @@ the confound is documented rather than removed.
 Two further limits: 40 rows rather than 182, with the resolution consequence
 above; and one judge rather than a full 3×3 matrix, so this says gemma3's lead
 survives *this* neutral judge, not every judge.
+
+---
+
+## 3.11 The full 3×3 judge matrix
+
+§3.10 answered §4.5's question with one neutral judge. This completes the matrix
+with the third — qwen3.6 scoring all three models, including its own answers —
+and the third judge both settles the self-preference question and corrects a
+claim §3.10 made on one judge's evidence.
+
+Ran 2026-08-01 → 2026-08-02, 40 rows per model, 368 / 372 / 386 min per run,
+**0 of 240 rows unscored in every run**. Getting a thinking model to judge at all
+took two fixes (BUGS.md A5); before them it silently dropped rows.
+
+### `factual_correctness` — the metric the whole question is about
+
+| Judge →       | gemma3 | gemma4 | qwen3.6    | Winner |
+|---------------|-------:|-------:|-----------:|--------|
+| gemma3        | 0.9023 | 0.8369 | 0.7733     | gemma3 |
+| claude-opus-5 | 0.8828 | 0.7775 | 0.7728     | gemma3 |
+| qwen3.6       | 0.8467 | 0.7183 | **0.6188** | gemma3 |
+
+**gemma3 wins under all three judges**, including under the two that are its
+competitors. That is as settled as this benchmark can make it.
+
+### qwen3.6 does not favour itself — it is harshest on itself
+
+The bolded 0.6188 is the lowest figure in the matrix, and qwen3.6 awarded it to
+its own answers. Measuring each judge's strictness against the neutral one:
+
+| Judged model         | qwen3.6's score − claude's |
+|----------------------|---------------------------:|
+| gemma3               | −0.036                     |
+| gemma4               | −0.059                     |
+| **qwen3.6 (itself)** | **−0.154**                 |
+
+qwen3.6 marks everything down, and marks *itself* down three times harder than it
+marks its rivals. Whatever this judge is doing, self-preference is not it.
+
+That also disposes of the residual suspicion about gemma3. gemma3 scores itself
++0.0195 above the neutral judge — **below this sample's 0.025 resolution**. Across
+three judges there is no measurable self-preference from either model that judged
+its own work. §4.5's mechanism is real in the literature; it is not detectable
+here.
+
+### What is unanimous, and what is not
+
+| Metric              | gemma3 judge | claude judge | qwen3.6 judge | Robust?                |
+|---------------------|--------------|--------------|---------------|------------------------|
+| factual_correctness | gemma3       | gemma3       | gemma3        | yes                    |
+| answer_similarity   | gemma3       | gemma3       | gemma3        | yes (no judge in loop) |
+| answer_relevancy    | qwen3.6      | qwen3.6      | qwen3.6       | yes                    |
+| faithfulness        | gemma4       | gemma4       | **gemma3**    | **no**                 |
+
+`faithfulness` is the only metric whose winner changes with the judge — gemma4
+takes it under two judges, gemma3 under the third (0.9875 vs 0.9599). §3.9 had
+already noted gemma4's `faithfulness` win sat inside the noise floor against
+gemma3; a judge that reverses it confirms that reading. Treat "gemma4 is the most
+faithful" as unsupported.
+
+`answer_similarity` is **identical to four decimals under all three judges**, as
+it must be — cosine similarity between embeddings, no judge in the loop. Three
+independent scorings agreeing exactly is the control that makes the rest of this
+table trustworthy.
+
+### The corrected reading of second place
+
+| `factual_correctness` | gemma3 judge | claude judge | qwen3.6 judge |
+|-----------------------|-------------:|-------------:|--------------:|
+| gemma4 − qwen3.6      | +0.0636      | +0.0047      | +0.0995       |
+
+§3.10 saw the middle column and concluded second place was an artefact of the
+judge. With the third column that is wrong: the margin ranges from a tie to ten
+points, but **the order never reverses**. claude-opus-5 is the outlier here, not
+the arbiter — the lesson being that one neutral judge measures one judge's
+opinion, which is the same trap §4.5 identified, one level up.
+
+**So the ranking on `factual_correctness` — gemma3, gemma4, qwen3.6 — is
+unanimous across three judges. What is judge-dependent is how far apart they are,
+and that varies by a factor of twenty.**
+
+### What this still does not settle
+
+Three judges are not a random sample of judges, and two of the three are
+contestants. Answer length remains confounded with model identity (§4.10.4), the
+subset is 40 rows with a 0.025 resolution, and the neutral judge is prompted over
+a different endpoint than the local two (BUGS.md A4). None of that is fixed by
+adding a third column; it is fixed by a better dataset (§4.2, §4.10.2).

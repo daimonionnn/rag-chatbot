@@ -196,17 +196,29 @@ confound was real but pointed the other way: gemma3 judging itself was
 *understating* its margin, not manufacturing it. The concern this section raised
 was legitimate and the conclusion it feared was not.
 
-What did not survive is the part nobody was worried about. gemma4 and qwen3.6
-were separated by +0.064 on `factual_correctness` under gemma3 and by **+0.004**
-under a neutral judge — indistinguishable, at a sixth of the sample's resolution.
-**"gemma3 first" is a finding about the models; "gemma4 second, qwen3.6 third"
-was a finding about the judge.**
+What did not survive is the part nobody was worried about — or so it looked with
+two judges. gemma4 and qwen3.6 were separated by +0.064 on `factual_correctness`
+under gemma3 and by **+0.004** under the neutral judge, which read as second
+place being an artefact.
 
-Two things this does not close. The neutral judge is prompted over chat
+**The third judge corrected that** ([EVALUATION.md §3.11](EVALUATION.md),
+2026-08-02). Under qwen3.6 the same pair is separated by +0.0995 — across three
+judges the margin runs from a tie to ten points while the order never reverses.
+The neutral judge was the outlier, not the arbiter, and generalising from it was
+the same error this section warns about, one level up.
+
+**Self-preference is not detectable here at all.** qwen3.6 scores its own answers
+0.6188 — the lowest figure in the whole matrix — and is three times harsher on
+itself than on its rivals. gemma3 scores itself +0.0195 above the neutral judge,
+below the sample's 0.025 resolution. Both models that judged their own work
+failed to favour it.
+
+What this still does not close. The neutral judge is prompted over chat
 completions while the local judges use raw text completions (BUGS.md A4), so
-"different judge" and "different framing" are confounded with each other. And one
-neutral judge is one column, not the 3×3 matrix — the claim is that gemma3's lead
-survives *this* judge.
+"different judge" and "different framing" are confounded with each other. And
+three judges are not a random sample of judges — two of them are contestants —
+so "no self-preference detectable" is a statement about these three, at this
+sample's 0.025 resolution.
 
 ---
 
@@ -281,10 +293,13 @@ difference found.
    production trade-off the current table hides entirely.
 5. **Report retrieval metrics once**, not per model (§4.1). Removes a
    misleading column — confirmed bit-identical between two of the three models.
-6. ~~**Cross-judge on a 40-question subset** (§4.5).~~ **Done, 2026-08-01** —
-   gemma3's lead survived and grew; the gemma4/qwen3.6 ordering did not survive.
-   The remaining work is the other two columns of the matrix, which would say
-   whether *any* judge reorders the top place rather than just this one.
+6. ~~**Cross-judge on a 40-question subset** (§4.5).~~ **Done — full 3×3 matrix,
+   2026-08-02** ([EVALUATION.md §3.11](EVALUATION.md)). `factual_correctness`
+   ranks gemma3 > gemma4 > qwen3.6 under all three judges; no self-preference is
+   detectable from either model that judged itself; the one ordering that is not
+   robust is gemma4's `faithfulness` win, which a third judge reverses. Nothing
+   further is worth spending here — the remaining uncertainty is in the dataset
+   (items 0 and 7), not the judge.
 7. **Extend the test set**: paraphrases, multi-document questions, unanswerable
    questions (§4.2). The biggest change, and the one that would make the
    benchmark measure reasoning rather than copying.

@@ -151,6 +151,67 @@ completion — is a caveat of the cross-judge comparison rather than something t
 patch can remove: no endpoint exists on which both kinds of judge can be prompted
 identically.
 
+### A5. A thinking judge silently drops rows, twice over
+
+Pointing the cross-judge harness (§4.5) at qwen3.6 produced scores with holes in
+them and no failure anywhere. Two separate causes, the first hiding the second.
+
+**Timeout.** ragas' `RunConfig` defaults to **180 s per LLM call**. That is ample
+for a non-thinking judge — gemma3 and claude-opus-5 both average ~16 s per
+(row, metric) — but qwen3.6 measured ~95 s per (row, metric) with individual
+calls exceeding the limit:
+
+```
+ERROR ragas.executor: Exception raised in Job[11]: TimeoutError()
+```
+
+Because the provider is deliberately run with `raise_exceptions: false` (so one
+bad row cannot kill a multi-hour job — see A2), the row became NaN **silently**.
+In a 2-row smoke test that was half of `factual_correctness`, the one metric the
+cross-judge comparison exists to settle. The timeout is not reachable through the
+provider's `ragas_config`, which exposes only `batch_size` / `show_progress` /
+`raise_exceptions` / `experiment_name` / `column_map`. Fixed by
+`patch-ragas-timeout.py`, which reads `RAGAS_TIMEOUT` from the environment;
+unset keeps ragas' default, so existing runs are untouched.
+
+**Empty output, mistaken for broken JSON.** With the timeout raised, a different
+failure surfaced:
+
+```
+ragas.prompt.pydantic_prompt: Prompt statement_generator_prompt failed to parse output
+ragas.prompt.pydantic_prompt: Prompt fix_output_format failed to parse output
+```
+
+which reads as a thinking model emitting unparseable JSON. It was not emitting
+bad JSON — it was emitting **nothing**. Ollama's OpenAI-compatible endpoint
+charges reasoning tokens against `max_tokens` without returning them, so a judge
+that spends the whole ceiling thinking returns `finish_reason: "length"` with
+zero characters of text. Measured on one subset row:
+
+| `max_tokens` | finish_reason | output chars | completion tokens | parses |
+|-------------:|---------------|-------------:|------------------:|--------|
+| 4096         | length        | 0            | 4096              | no     |
+| 8192         | stop          | 550          | 5121              | yes    |
+| 16384        | stop          | 550          | 5121              | yes    |
+
+~4900 of those tokens were reasoning. Note the second log line: ragas' own
+`fix_output_format` repair prompt went to the *same model with the same ceiling*
+and produced the same emptiness — the safety net is cut from the cloth of the
+hole.
+
+Fixed by `THINKING_JUDGES` in `score_ragas.py`, which raises the ceiling to 16384
+for judges known to reason. Non-thinking judges keep 4096 so every score already
+in EVALUATION.md stays reproducible.
+
+**Both fixes are required together** and neither substitutes for the other: a
+larger budget means longer calls, which without the raised timeout fail on time
+instead. With both, three 40-row runs scored **240 of 240 units each**.
+
+**The general shape**, worth carrying to any harness: a per-call timeout plus
+lenient error handling turns a slow judge into a *quietly biased* one. The rows
+that drop are not random — they are the ones the judge found hardest, which is
+exactly the population a quality metric is about.
+
 ## B. Silent failures (no error, feature simply absent)
 
 ### B1. fastText + NumPy 2 disables the language rail entirely

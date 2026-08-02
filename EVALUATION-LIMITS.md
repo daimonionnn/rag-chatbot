@@ -280,8 +280,10 @@ difference found.
 
 0. **Fix the 23 duplicate/narrow-reference questions** (§4.10.2). Measured to
    depress `factual_correctness` by more than any model-to-model gap in the
-   benchmark, for all three models. Nothing else on this list is worth doing
-   before this.
+   benchmark, for all three models — so the absolute figures are not
+   trustworthy until this is done. It is **not** what the ranking hinges on,
+   though: §4.10.5 measured that removing those rows changes no winner. Fix it
+   for the numbers, not for the conclusion.
 1. **Noise floor** from repeat runs (§4.6, §4.10.1). Without it, none of the
    3–5 point model gaps found are defensible as real.
 2. **Output language ID** on every answer (§4.4). Cheapest remaining item,
@@ -414,3 +416,60 @@ is the same mechanism as §4.10.2, operating continuously rather than as a binar
 dataset defect — another reason `answer_similarity` and `factual_correctness`
 should not be read as the final word on quality without the fluency/relevancy
 metrics alongside them.
+
+
+### 4.10.5 Would different questions give a different winner? Measured
+
+§4.10.1 complained that with one run per model there is no distribution to
+compare a 3–5 point gap against. There is one, and it does not need a repeat run:
+the per-row scores already are a sample, so resampling them answers how much of
+the ranking is the *question set* rather than the models.
+
+Two tests, both on the gemma3-judged full run.
+
+**Dropping the duplicates changes no winner.** Removing all 46
+duplicate-question rows (§4.10.2) and re-ranking on the 136 unique ones:
+
+| Metric              | all rows             | duplicates removed  |
+|---------------------|----------------------|---------------------|
+| factual_correctness | gemma3 (+0.046 lead) | gemma3 (**+0.058**) |
+| answer_similarity   | gemma3               | gemma3              |
+| faithfulness        | gemma4               | gemma4              |
+| answer_relevancy    | qwen3.6              | qwen3.6             |
+
+gemma3's lead *grows*, consistent with §4.10.2's finding that those rows
+penalised it hardest. So the dataset defect distorts the absolute numbers without
+touching the ordering.
+
+**Bootstrap over questions.** 10,000 resamples with replacement of the 136 unique
+questions, recording which model wins each time:
+
+| Metric              | gemma3      | gemma4     | qwen3.6    |
+|---------------------|------------:|-----------:|-----------:|
+| factual_correctness | **100.0 %** | 0.0 %      | 0.0 %      |
+| answer_similarity   | **100.0 %** | 0.0 %      | 0.0 %      |
+| faithfulness        | 20.9 %      | **78.3 %** | 0.9 %      |
+| answer_relevancy    | 0.0 %       | 17.6 %     | **82.4 %** |
+
+**gemma3's two wins never lost, in ten thousand resamplings.** They are not a
+lucky draw of questions.
+
+The unstable ones are the other models' wins. `faithfulness` goes to gemma3 in
+roughly one resampling in five — and that is the same metric whose winner
+§3.11 found flips when the judge changes. Two independent perturbations, the
+question sample and the judge, single out the same result. "gemma4 is the most
+faithful" should be treated as unsupported by either route.
+
+**What this does not answer.** Bootstrapping resamples *this* pool, so it speaks
+to "a different sample of similar questions", not "a different kind of question".
+§4.2 measured that 99 % of the questions and their reference answers appear
+verbatim in an ingested PDF — this is a retrieval-and-copy task. A set built from
+paraphrases, multi-document questions and unanswerable ones could reorder
+everything, and no resampling of the current set can see that. gemma3 wins at
+producing text closest to a terse FAQ reference; that is what was measured, and
+it is not the same claim as "gemma3 is the best model".
+
+**Consequence for the backlog.** Item 0 (fix the duplicates) stays first for the
+absolute numbers, which it demonstrably distorts — but it is now known *not* to
+be load-bearing for the ranking. The ranking's real exposure is item 7, extending
+the test set.
